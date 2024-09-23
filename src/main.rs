@@ -1,3 +1,4 @@
+mod primes;
 
 fn main() {
     println!("RSA-like encryption algorithm relying on the Euler number theory theorem will be implemented here...");
