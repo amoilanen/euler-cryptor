@@ -1,10 +1,13 @@
 mod primes;
+mod euclidean;
+mod keys;
 
 fn main() {
     println!("RSA-like encryption algorithm relying on the Euler number theory theorem will be implemented here...");
 }
 
 //TODO: Find two large prime numbers p and q. n = p * q, phi(n) = (p - 1)(q - 1)
+//TODO: Choose a large enough public exponent e such as e > 10000, e is prime and e < phi(n)
 //TODO: Compute the public and the private exponent (components of the public and private keys), use the extended Euclidean algorithm to solve d * e = 1 (mod phi(n))
 //TODO: Implement the encryption and decryption procedures
 

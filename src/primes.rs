@@ -66,6 +66,7 @@ mod tests {
         assert_eq!(primes_segment(10, 20), vec![11, 13, 17, 19]);
         assert_eq!(primes_segment(40, 50), vec![41, 43, 47]);
         assert_eq!(primes_segment(80, 100), vec![83, 89, 97]);
+        assert_eq!(primes_segment(10000000000000, 10000000000100), vec![10000000000037, 10000000000051, 10000000000099]);
         //Would already be too slow, better to use a more optimized approach, such as the AKS primality test
         //assert_eq!(primes_segment(1000000000000000000, 1000000000000001000), vec![]);
     }
