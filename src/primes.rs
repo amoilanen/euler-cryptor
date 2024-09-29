@@ -26,7 +26,7 @@ fn primes(up_to: usize) -> Vec<usize> {
     primes
 }
 
-fn primes_segment(from: usize, to: usize) -> Vec<usize> {
+pub(crate) fn primes_segment(from: usize, to: usize) -> Vec<usize> {
     let largest_prime_to_cross_over = (to as f64).sqrt().ceil() as usize;
     let primes_to_cross_over = primes(largest_prime_to_cross_over);
     let segment_size = to - from + 1;
