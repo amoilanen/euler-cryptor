@@ -2,6 +2,7 @@ use core::num;
 
 use rand::seq::SliceRandom;
 use rand::Rng;
+use std::cmp;
 use num_bigint::{BigInt, Sign};
 use num_traits::{FromPrimitive, Zero};
 
@@ -9,16 +10,21 @@ mod primes;
 mod euclidean;
 mod crypto;
 
-fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, block_size_bytes: usize) -> Vec<u8> {
-    let number_to_encrypt = BigInt::from_bytes_be(Sign::Plus, data);
+//FIXME: Implement efficient exponentiation algorithm, the naive one is too slow
+fn encrypt_number(number_to_encrypt: &BigInt, key: &crypto::Key) -> BigInt {
     let modulo = BigInt::from_u64(key.modulo).unwrap();
     let mut exponent = BigInt::from_u64(key.exponent).unwrap();
     let mut result: BigInt = BigInt::from_u8(1).unwrap();
     while !exponent.is_zero() {
-        result = (result * &number_to_encrypt) % &modulo;
+        result = (result * number_to_encrypt) % &modulo;
         exponent = exponent - 1;
     }
-    let encrypted = result.to_bytes_be();
+    result
+}
+
+fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, block_size_bytes: usize) -> Vec<u8> {
+    let number_to_encrypt = BigInt::from_bytes_be(Sign::Plus, data);
+    let encrypted = encrypt_number(&number_to_encrypt, key).to_bytes_be();
     let mut result_bytes = encrypted.1;
     while result_bytes.len() < block_size_bytes {
         result_bytes.insert(0, 0u8); // Pad the result with zeros to be exactly block_size_bytes
@@ -26,8 +32,8 @@ fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, block_size_bytes: usize) -> 
     result_bytes
 }
 
-fn encrypt(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
-    let block_size_bytes = (key.modulo.ilog2() / 8) as usize;
+fn encrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
+    let block_size_bytes = cmp::max(key.modulo.ilog2() / 8, 1) as usize;
     println!("block size = {} bytes", block_size_bytes);
     let prefix = data.len().to_string() + ":";
     let mut all_bytes: Vec<u8> = prefix.as_bytes().to_vec();
@@ -40,8 +46,8 @@ fn encrypt(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
     encrypted
 }
 
-fn decrypt(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
-    let block_size_bytes = (key.modulo.ilog2() / 8) as usize;
+fn decrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
+    let block_size_bytes = cmp::max(key.modulo.ilog2() / 8, 1) as usize;
     println!("block size = {} bytes", block_size_bytes);
     let mut decrypted: Vec<u8> = Vec::new();
     for chunk in data.chunks(block_size_bytes) {
@@ -54,8 +60,12 @@ fn decrypt(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
 fn main() {
     println!("RSA-like encryption algorithm relying on the Euler number theory theorem will be implemented here...");
     //TODO: This is just an initial version, to be secure the primes would have to be selected randomly from a range  > Math.pow(2, 64) - Math.pow(2, 128)
+
+    //let primes_bottom: usize = 1024; //2^10
+    //let primes_top: usize = 16384; //2^24
     let primes_bottom: usize = 262144; //2^18
     let primes_top: usize = 16777216; //2^24
+
     let mut rng = rand::thread_rng();
     let mut primes_from = rng.gen_range(primes_bottom + 1..primes_top);
     let segment_size = 1000;
@@ -66,15 +76,23 @@ fn main() {
         let &new_q: &usize = primes::primes_segment(primes_from, primes_from + segment_size).choose(&mut rng).unwrap();
         q = new_q;
     }
-    let n = p * q;
+    let public_exponent: u64 = 65537;
+
+    //Just smaller numbers easier to debug with
+    /*
+    let public_exponent: u64 = 17;
+    let p: u64 = 61;
+    let q: u64 = 53;
+    */
+
+    let n: usize = p * q;
     let totient_function = (p - 1) * (q - 1);
     println!("p={:?}, q={:?}, n={:?}, totient_function={:?}", p, q, n, totient_function);
 
-    let public_exponent: u64 = 65537;
+    //FIXME: find_private_key (and find_gcd_and_bezout_coefficients used by it) should use BigInt arithmetic, otherwise overflowing leads to the wrong solution
+    let private_exponent: u64 = crypto::find_private_key(totient_function as i64, public_exponent as i64) as u64;
 
-    let gcd_and_bezout_coefficients = euclidean::find_gcd_and_bezout_coefficients(public_exponent as i64, totient_function as i64);
-    assert!(gcd_and_bezout_coefficients.gcd == 1);
-    let private_exponent: u64 = gcd_and_bezout_coefficients.x as u64;
+    println!("d={:?}, e={:?}", public_exponent, private_exponent);
 
     let public_key = crypto::Key {
         exponent: public_exponent,
@@ -85,11 +103,21 @@ fn main() {
         modulo: n as u64
     };
 
+    let original_number = BigInt::from_u32(65).unwrap();
+    println!("original number = {}", original_number);
+    let encrypted = encrypt_number(&original_number, &public_key);
+    println!("encrypted number = {}", encrypted);
+    let decrypted = encrypt_number(&encrypted, &private_key);
+    println!("decrypted number = {}", decrypted);
+    assert_eq!(original_number, decrypted);
+
+    /*
     let text = "The quick brown fox jumps over the lazy dog";
-    let encrypted = encrypt(&text.as_bytes().to_vec(), &public_key);
-    let decrypted = decrypt(&encrypted, &private_key);
+    let encrypted = encrypt_bytes(&text.as_bytes().to_vec(), &public_key);
+    let decrypted = decrypt_bytes(&encrypted, &private_key);
     let decrypted_text = String::from_utf8_lossy(&decrypted);
     println!("Decrypted text: '{}'", decrypted_text)
+    */
 }
 
 //TODO: Find two large prime numbers p and q. n = p * q, phi(n) = (p - 1)(q - 1)

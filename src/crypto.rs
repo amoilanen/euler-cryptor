@@ -5,7 +5,7 @@ pub(crate) struct Key {
     pub(crate) modulo: u64
 }
 
-fn find_private_key(totient_function: i64, public_key: i64) -> i64 {
+pub(crate) fn find_private_key(totient_function: i64, public_key: i64) -> i64 {
   let gcd_and_coefficients = euclidean::find_gcd_and_bezout_coefficients(public_key, totient_function);
   let mut private_key = gcd_and_coefficients.y;
   if private_key < 0 {
