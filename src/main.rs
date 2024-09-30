@@ -1,28 +1,61 @@
+use core::num;
+
 use rand::seq::SliceRandom;
 use rand::Rng;
+use num_bigint::{BigInt, Sign};
+use num_traits::{FromPrimitive, Zero};
 
 mod primes;
 mod euclidean;
 mod crypto;
 
+fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, block_size_bytes: usize) -> Vec<u8> {
+    let number_to_encrypt = BigInt::from_bytes_be(Sign::Plus, data);
+    let modulo = BigInt::from_u64(key.modulo).unwrap();
+    let mut exponent = BigInt::from_u64(key.exponent).unwrap();
+    let mut result: BigInt = BigInt::from_u8(1).unwrap();
+    while !exponent.is_zero() {
+        result = (result * &number_to_encrypt) % &modulo;
+        exponent = exponent - 1;
+    }
+    let encrypted = result.to_bytes_be();
+    let mut result_bytes = encrypted.1;
+    while result_bytes.len() < block_size_bytes {
+        result_bytes.insert(0, 0u8); // Pad the result with zeros to be exactly block_size_bytes
+    }
+    result_bytes
+}
+
 fn encrypt(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
-    //TODO: Implement
-    // - Append "{length_in_bytes}:" before the text being encrypted
-    // - Split the data into blocks of 8 bytes each
-    // - Encrypt every block as "M ^ key.exponent modulo key.modulo", do the arithmetic using BigInt to avoid overflow
-    Vec::new()
+    let block_size_bytes = (key.modulo.ilog2() / 8) as usize;
+    println!("block size = {} bytes", block_size_bytes);
+    let prefix = data.len().to_string() + ":";
+    let mut all_bytes: Vec<u8> = prefix.as_bytes().to_vec();
+    all_bytes.extend(data);
+
+    let mut encrypted: Vec<u8> = Vec::new();
+    for chunk in all_bytes.chunks(block_size_bytes) {
+        encrypted.extend(encrypt_chunk(&chunk.to_vec(), &key, block_size_bytes));
+    }
+    encrypted
 }
 
 fn decrypt(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
-    //TODO: Implement
-    Vec::new()
+    let block_size_bytes = (key.modulo.ilog2() / 8) as usize;
+    println!("block size = {} bytes", block_size_bytes);
+    let mut decrypted: Vec<u8> = Vec::new();
+    for chunk in data.chunks(block_size_bytes) {
+        decrypted.extend(encrypt_chunk(&chunk.to_vec(), &key, block_size_bytes));
+    }
+    //TODO: Read the length of the encrypted data (in bytes) and 
+    decrypted
 }
 
 fn main() {
     println!("RSA-like encryption algorithm relying on the Euler number theory theorem will be implemented here...");
-    //TODO: This is just an initial version, to be secure the primes would have to be selected randomly from a range  > Math.pow(2, 64)
-    let primes_bottom: usize = 16777216; //2^24 - allows to encode blocks of 24 / 8 = 3 bytes since a < p, q where n = p * q
-    let primes_top: usize = 4294967296; //2^32
+    //TODO: This is just an initial version, to be secure the primes would have to be selected randomly from a range  > Math.pow(2, 64) - Math.pow(2, 128)
+    let primes_bottom: usize = 262144; //2^18
+    let primes_top: usize = 16777216; //2^24
     let mut rng = rand::thread_rng();
     let mut primes_from = rng.gen_range(primes_bottom + 1..primes_top);
     let segment_size = 1000;
@@ -78,3 +111,4 @@ fn main() {
 // - Use BigInt arithmetic and avoid the limitations of u64 (and avoid u64 <-> i64 conversions especially and ignoring potential overflows)
 
 //TODO: Use a padding scheme when ecrypting the message to increase security
+//TODO: Allow to stream the message contents when encrypting and decrypting
