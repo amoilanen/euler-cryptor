@@ -10,14 +10,19 @@ mod primes;
 mod euclidean;
 mod crypto;
 
-//FIXME: Implement efficient exponentiation algorithm, the naive one is too slow
 fn encrypt_number(number_to_encrypt: &BigInt, key: &crypto::Key) -> BigInt {
     let modulo = BigInt::from_u64(key.modulo).unwrap();
     let mut exponent = BigInt::from_u64(key.exponent).unwrap();
     let mut result: BigInt = BigInt::from_u8(1).unwrap();
+    let mut number_to_exponentiate: BigInt = number_to_encrypt.clone();
     while !exponent.is_zero() {
-        result = (result * number_to_encrypt) % &modulo;
-        exponent = exponent - 1;
+        if &exponent % 2 == BigInt::from_u8(0).unwrap() {
+            exponent = exponent / 2;
+            number_to_exponentiate = (&number_to_exponentiate * &number_to_exponentiate) % &modulo;
+        } else {
+            exponent = exponent - 1;
+            result = (result * &number_to_exponentiate) % &modulo;
+        }
     }
     result
 }
@@ -66,6 +71,9 @@ fn main() {
     let primes_bottom: usize = 262144; //2^18
     let primes_top: usize = 16777216; //2^24
 
+    //let primes_bottom: usize = 16777216; //2^24
+    //let primes_top: usize = 4294967296; //2^32
+
     let mut rng = rand::thread_rng();
     let mut primes_from = rng.gen_range(primes_bottom + 1..primes_top);
     let segment_size = 1000;
@@ -81,8 +89,8 @@ fn main() {
     //Just smaller numbers easier to debug with
     /*
     let public_exponent: u64 = 17;
-    let p: u64 = 61;
-    let q: u64 = 53;
+    let p: usize = 61;
+    let q: usize = 53;
     */
 
     let n: usize = p * q;
@@ -93,6 +101,8 @@ fn main() {
     let private_exponent: u64 = crypto::find_private_key(totient_function as i64, public_exponent as i64) as u64;
 
     println!("d={:?}, e={:?}", public_exponent, private_exponent);
+
+    println!("d * e mod phi(n) = {}", (public_exponent * private_exponent) % totient_function as u64);
 
     let public_key = crypto::Key {
         exponent: public_exponent,
