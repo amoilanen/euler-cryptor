@@ -11,17 +11,17 @@ mod euclidean;
 mod crypto;
 
 fn encrypt_number(number_to_encrypt: &BigInt, key: &crypto::Key) -> BigInt {
-    let modulo = BigInt::from_u64(key.modulo).unwrap();
-    let mut exponent = BigInt::from_u64(key.exponent).unwrap();
+    let modulo = &key.modulo;
+    let mut exponent = key.exponent.clone();
     let mut result: BigInt = BigInt::from_u8(1).unwrap();
     let mut number_to_exponentiate: BigInt = number_to_encrypt.clone();
     while !exponent.is_zero() {
         if &exponent % 2 == BigInt::from_u8(0).unwrap() {
             exponent = exponent / 2;
-            number_to_exponentiate = (&number_to_exponentiate * &number_to_exponentiate) % &modulo;
+            number_to_exponentiate = (&number_to_exponentiate * &number_to_exponentiate) % modulo;
         } else {
             exponent = exponent - 1;
-            result = (result * &number_to_exponentiate) % &modulo;
+            result = (result * &number_to_exponentiate) % modulo;
         }
     }
     result
@@ -38,7 +38,7 @@ fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, block_size_bytes: usize) -> 
 }
 
 fn encrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
-    let block_size_bytes = cmp::max(key.modulo.ilog2() / 8, 1) as usize;
+    let block_size_bytes = cmp::max((key.modulo.bits() - 1) / 8, 1) as usize;
     println!("block size = {} bytes", block_size_bytes);
     let prefix = data.len().to_string() + ":";
     let mut all_bytes: Vec<u8> = prefix.as_bytes().to_vec();
@@ -52,7 +52,7 @@ fn encrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
 }
 
 fn decrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
-    let block_size_bytes = cmp::max(key.modulo.ilog2() / 8, 1) as usize;
+    let block_size_bytes = cmp::max((key.modulo.bits() - 1) / 8, 1) as usize;
     println!("block size = {} bytes", block_size_bytes);
     let mut decrypted: Vec<u8> = Vec::new();
     for chunk in data.chunks(block_size_bytes) {
@@ -68,23 +68,23 @@ fn main() {
 
     //let primes_bottom: usize = 1024; //2^10
     //let primes_top: usize = 16384; //2^24
-    let primes_bottom: usize = 262144; //2^18
-    let primes_top: usize = 16777216; //2^24
+    //let primes_bottom: usize = 262144; //2^18
+    //let primes_top: usize = 16777216; //2^24
 
-    //let primes_bottom: usize = 16777216; //2^24
-    //let primes_top: usize = 4294967296; //2^32
+    let primes_bottom: usize = 16777216; //2^24
+    let primes_top: usize = 4294967296; //2^32
 
     let mut rng = rand::thread_rng();
     let mut primes_from = rng.gen_range(primes_bottom + 1..primes_top);
     let segment_size = 1000;
-    let &p: &usize = primes::primes_segment(primes_from, primes_from + segment_size).choose(&mut rng).unwrap();
-    let mut q: usize = p;
+    let p = BigInt::from_usize(primes::primes_segment(primes_from, primes_from + segment_size).choose(&mut rng).unwrap().clone()).unwrap();
+    let mut q: BigInt = p.clone();
     while q == p {
         primes_from = rng.gen_range(primes_bottom + 1..primes_top);
-        let &new_q: &usize = primes::primes_segment(primes_from, primes_from + segment_size).choose(&mut rng).unwrap();
+        let new_q = BigInt::from_usize(primes::primes_segment(primes_from, primes_from + segment_size).choose(&mut rng).unwrap().clone()).unwrap();
         q = new_q;
     }
-    let public_exponent: u64 = 65537;
+    let public_exponent: BigInt = BigInt::from_u32(65537).unwrap();
 
     //Just smaller numbers easier to debug with
     /*
@@ -93,24 +93,23 @@ fn main() {
     let q: usize = 53;
     */
 
-    let n: usize = p * q;
-    let totient_function = (p - 1) * (q - 1);
+    let n: BigInt = &p * &q;
+    let totient_function = (&p - 1) * (&q - 1);
     println!("p={:?}, q={:?}, n={:?}, totient_function={:?}", p, q, n, totient_function);
 
-    //FIXME: find_private_key (and find_gcd_and_bezout_coefficients used by it) should use BigInt arithmetic, otherwise overflowing leads to the wrong solution
-    let private_exponent: u64 = crypto::find_private_key(totient_function as i64, public_exponent as i64) as u64;
+    let private_exponent = crypto::find_private_key(&totient_function, &public_exponent);
 
     println!("d={:?}, e={:?}", public_exponent, private_exponent);
 
-    println!("d * e mod phi(n) = {}", (public_exponent * private_exponent) % totient_function as u64);
+    println!("d * e mod phi(n) = {}", (&public_exponent * &private_exponent) % totient_function);
 
     let public_key = crypto::Key {
         exponent: public_exponent,
-        modulo: n as u64
+        modulo: n.clone()
     };
     let private_key = crypto::Key {
         exponent: private_exponent,
-        modulo: n as u64
+        modulo: n
     };
 
     let original_number = BigInt::from_u32(65).unwrap();

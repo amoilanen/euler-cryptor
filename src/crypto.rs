@@ -1,14 +1,17 @@
+use num_bigint::BigInt;
+use num_traits::FromPrimitive;
+
 use crate::euclidean;
 
 pub(crate) struct Key {
-    pub(crate) exponent: u64,
-    pub(crate) modulo: u64
+    pub(crate) exponent: BigInt,
+    pub(crate) modulo: BigInt
 }
 
-pub(crate) fn find_private_key(totient_function: i64, public_key: i64) -> i64 {
+pub(crate) fn find_private_key(totient_function: &BigInt, public_key: &BigInt) -> BigInt {
   let gcd_and_coefficients = euclidean::find_gcd_and_bezout_coefficients(public_key, totient_function);
   let mut private_key = gcd_and_coefficients.y;
-  if private_key < 0 {
+  if private_key < BigInt::from_u8(0).unwrap() {
     private_key = private_key + totient_function;
   }
   private_key
@@ -20,6 +23,6 @@ mod tests {
 
     #[test]
     fn should_find_private_key() {
-        assert_eq!(find_private_key(3120, 17), 2753)
+        assert_eq!(find_private_key(&BigInt::from_u32(3120).unwrap(), &BigInt::from_u32(17).unwrap()), BigInt::from_u32(2753).unwrap())
     }
 }
