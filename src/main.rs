@@ -27,8 +27,10 @@ fn encrypt_number(number_to_encrypt: &BigInt, key: &crypto::Key) -> BigInt {
     result
 }
 
+const ENCRYPTED_PREFIX: u8 = 128;
+
 fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, modulo_size_bytes: usize) -> Vec<u8> {
-    let number_to_encrypt = BigInt::from_bytes_be(Sign::Plus, data);
+    let number_to_encrypt = BigInt::from_bytes_be(Sign::Plus, &data);
     let encrypted = encrypt_number(&number_to_encrypt, key).to_bytes_be();
     let mut result_bytes = encrypted.1;
     while result_bytes.len() < modulo_size_bytes {
@@ -39,7 +41,8 @@ fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, modulo_size_bytes: usize) ->
 
 fn encrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
     let modulo_size_bytes = ((key.modulo.bits() + 7) / 8) as usize;
-    let block_size_bytes = cmp::max(modulo_size_bytes - 1, 1);
+    // leave one byte for ENCRYPTED_PREFIX and one byte to make sure that modulo is not overflown
+    let block_size_bytes = cmp::max(modulo_size_bytes - 2, 1);
     println!("modulo_size_bytes = {}", modulo_size_bytes);
     println!("block_size_bytes = {}", block_size_bytes);
     //let prefix = data.len().to_string() + ":";
@@ -49,13 +52,13 @@ fn encrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
 
     let mut encrypted: Vec<u8> = Vec::new();
     for chunk in all_bytes.chunks(block_size_bytes) {
-        let encrypted_chunk = encrypt_chunk(&chunk.to_vec(), &key, modulo_size_bytes);
-        /*
-        println!("Length of encrypted_chunk = {}", encrypted_chunk.len());
-        let decrypted_chunk = encrypt_chunk(&encrypted_chunk, &other_key, modulo_size_bytes);
-        println!("Length of decrypted_chunk = {}", decrypted_chunk.len());
-        println!("Decrypted chunk as text = {}", String::from_utf8_lossy(&decrypted_chunk));
-        */
+        println!("chunk_size = {}", &chunk.to_vec().len());
+        println!("chunk = {:?}", &chunk.to_vec());
+        let mut data_to_encrypt: Vec<u8> = Vec::new();
+        data_to_encrypt.push(ENCRYPTED_PREFIX);
+        data_to_encrypt.extend(chunk);
+        let encrypted_chunk = encrypt_chunk(&data_to_encrypt.to_vec(), &key, modulo_size_bytes);
+        println!("encrypted_chunk_size = {}", encrypted_chunk.len());
         encrypted.extend(encrypted_chunk);
     }
     encrypted
@@ -66,7 +69,18 @@ fn decrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
     println!("modulo_size_bytes = {}", modulo_size_bytes);
     let mut decrypted: Vec<u8> = Vec::new();
     for chunk in data.chunks(modulo_size_bytes) {
-        decrypted.extend(encrypt_chunk(&chunk.to_vec(), &key, modulo_size_bytes));
+        let decrypted_data = encrypt_chunk(&chunk.to_vec(), &key, modulo_size_bytes);
+        let mut i = 0;
+        let mut has_found_prefix = decrypted_data[i] == ENCRYPTED_PREFIX;
+        while !has_found_prefix && decrypted_data[i] == 0 {
+            i = i + 1;
+            has_found_prefix = decrypted_data[i] == ENCRYPTED_PREFIX;
+        }
+        assert!(has_found_prefix);
+        let decrypted_chunk = decrypted_data[i + 1..].to_vec();
+        println!("decrypted_chunk_size = {}", decrypted_chunk.len());
+        println!("decrypted_chunk = {:?}", decrypted_chunk);
+        decrypted.extend(decrypted_chunk);
     }
     decrypted
 }
