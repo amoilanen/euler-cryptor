@@ -27,38 +27,47 @@ fn encrypt_number(number_to_encrypt: &BigInt, key: &crypto::Key) -> BigInt {
     result
 }
 
-fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, block_size_bytes: usize) -> Vec<u8> {
+fn encrypt_chunk(data: &Vec<u8>, key: &crypto::Key, modulo_size_bytes: usize) -> Vec<u8> {
     let number_to_encrypt = BigInt::from_bytes_be(Sign::Plus, data);
     let encrypted = encrypt_number(&number_to_encrypt, key).to_bytes_be();
     let mut result_bytes = encrypted.1;
-    while result_bytes.len() < block_size_bytes {
-        result_bytes.insert(0, 0u8); // Pad the result with zeros to be exactly block_size_bytes
+    while result_bytes.len() < modulo_size_bytes {
+        result_bytes.insert(0, 0u8); // Pad the result with zeros to be exactly modulo_size_bytes
     }
     result_bytes
 }
 
 fn encrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
-    let block_size_bytes = cmp::max((key.modulo.bits() - 1) / 8, 1) as usize;
-    println!("block size = {} bytes", block_size_bytes);
-    let prefix = data.len().to_string() + ":";
-    let mut all_bytes: Vec<u8> = prefix.as_bytes().to_vec();
+    let modulo_size_bytes = ((key.modulo.bits() + 7) / 8) as usize;
+    let block_size_bytes = cmp::max(modulo_size_bytes - 1, 1);
+    println!("modulo_size_bytes = {}", modulo_size_bytes);
+    println!("block_size_bytes = {}", block_size_bytes);
+    //let prefix = data.len().to_string() + ":";
+    let mut all_bytes = Vec::new();
+    //let mut all_bytes: Vec<u8> = prefix.as_bytes().to_vec();
     all_bytes.extend(data);
 
     let mut encrypted: Vec<u8> = Vec::new();
     for chunk in all_bytes.chunks(block_size_bytes) {
-        encrypted.extend(encrypt_chunk(&chunk.to_vec(), &key, block_size_bytes));
+        let encrypted_chunk = encrypt_chunk(&chunk.to_vec(), &key, modulo_size_bytes);
+        /*
+        println!("Length of encrypted_chunk = {}", encrypted_chunk.len());
+        let decrypted_chunk = encrypt_chunk(&encrypted_chunk, &other_key, modulo_size_bytes);
+        println!("Length of decrypted_chunk = {}", decrypted_chunk.len());
+        println!("Decrypted chunk as text = {}", String::from_utf8_lossy(&decrypted_chunk));
+        */
+        encrypted.extend(encrypted_chunk);
     }
     encrypted
 }
 
 fn decrypt_bytes(data: &Vec<u8>, key: &crypto::Key) -> Vec<u8> {
-    let block_size_bytes = cmp::max((key.modulo.bits() - 1) / 8, 1) as usize;
-    println!("block size = {} bytes", block_size_bytes);
+    let modulo_size_bytes = ((key.modulo.bits() + 7) / 8) as usize;
+    println!("modulo_size_bytes = {}", modulo_size_bytes);
     let mut decrypted: Vec<u8> = Vec::new();
-    for chunk in data.chunks(block_size_bytes) {
-        decrypted.extend(encrypt_chunk(&chunk.to_vec(), &key, block_size_bytes));
+    for chunk in data.chunks(modulo_size_bytes) {
+        decrypted.extend(encrypt_chunk(&chunk.to_vec(), &key, modulo_size_bytes));
     }
-    //TODO: Read the length of the encrypted data (in bytes) and 
     decrypted
 }
 
@@ -112,7 +121,8 @@ fn main() {
         modulo: n
     };
 
-    let original_number = BigInt::from_u32(65).unwrap();
+    //let original_number = BigInt::from_u64(65).unwrap();
+    let original_number = BigInt::from_u64(4093350987293047).unwrap();
     println!("original number = {}", original_number);
     let encrypted = encrypt_number(&original_number, &public_key);
     println!("encrypted number = {}", encrypted);
@@ -120,13 +130,11 @@ fn main() {
     println!("decrypted number = {}", decrypted);
     assert_eq!(original_number, decrypted);
 
-    /*
     let text = "The quick brown fox jumps over the lazy dog";
     let encrypted = encrypt_bytes(&text.as_bytes().to_vec(), &public_key);
     let decrypted = decrypt_bytes(&encrypted, &private_key);
     let decrypted_text = String::from_utf8_lossy(&decrypted);
     println!("Decrypted text: '{}'", decrypted_text)
-    */
 }
 
 //TODO: Find two large prime numbers p and q. n = p * q, phi(n) = (p - 1)(q - 1)
