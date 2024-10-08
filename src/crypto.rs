@@ -1,11 +1,13 @@
 use num_bigint::{BigInt, Sign};
 use num_traits::{FromPrimitive, Zero};
+use core::num;
 use std::cmp;
 use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::euclidean;
 use crate::primes;
+use crate::modulo_arithmetic;
 
 #[derive(Debug)]
 pub(crate) struct Key {
@@ -59,20 +61,7 @@ pub(crate) fn generate_keys() -> (Key, Key) {
 }
 
 fn encrypt_number(number_to_encrypt: &BigInt, key: &Key) -> BigInt {
-    let modulo = &key.modulo;
-    let mut exponent = key.exponent.clone();
-    let mut result: BigInt = BigInt::from_u8(1).unwrap();
-    let mut number_to_exponentiate: BigInt = number_to_encrypt.clone();
-    while !exponent.is_zero() {
-        if &exponent % 2 == BigInt::from_u8(0).unwrap() {
-            exponent = exponent / 2;
-            number_to_exponentiate = (&number_to_exponentiate * &number_to_exponentiate) % modulo;
-        } else {
-            exponent = exponent - 1;
-            result = (result * &number_to_exponentiate) % modulo;
-        }
-    }
-    result
+    modulo_arithmetic::exponent(number_to_encrypt, &key.exponent, &key.modulo)
 }
 
 const ENCRYPTED_CHUNK_PREFIX: u8 = 128;
