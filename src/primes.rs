@@ -65,16 +65,14 @@ pub(crate) fn primes_segment(from: usize, to: usize) -> Vec<usize> {
  */
 const NUM_OF_BASES_TO_TRY: u8 = 50;
 
-//TODO: Debug and make the tests pass
-pub(crate) fn miller_rabin_primality_test(p: &BigInt) -> bool {
+pub(crate) fn miller_rabin_primality_test(n: &BigInt) -> bool {
     let mut rng = thread_rng();
-    if p % 2 == BigInt::zero() {
+    if n % 2 == BigInt::zero() {
         return false
     }
-    // a ^ (p - 1) = 1 (mod p) for prime p (Fermat's Little Theorem)
-    let n: BigInt = p - 1;
+    // a ^ (n - 1) = 1 (mod n) for prime n (Fermat's Little Theorem)
     let mut s = 0;
-    let mut d: BigInt = n;
+    let mut d: BigInt = n - 1;
     while &d % 2 == BigInt::zero() {
         s = s + 1;
         d = d / BigInt::from_u8(2).unwrap();
@@ -84,15 +82,15 @@ pub(crate) fn miller_rabin_primality_test(p: &BigInt) -> bool {
 
     while passed_check && bases_to_try > 0 {
         bases_to_try = bases_to_try - 1;
-        let base = rng.gen_bigint_range(&BigInt::from(1), &p);
-        let mut base_exponent = modulo_arithmetic::exponent(&base, &d, &p);
+        let base = rng.gen_bigint_range(&BigInt::from(2), &(n - &BigInt::from(1)));
+        let mut base_exponent = modulo_arithmetic::exponent(&base, &d, &n);
 
         // a ^ d != 1 (mod p)
         if base_exponent != BigInt::from_u8(1).unwrap() {
             let mut r = 0;
             // a ^ (2 ^ r) ^ d != -1 (mod p)
-            while base_exponent != BigInt::from_i8(-1).unwrap() && r < s {
-                base_exponent = (&base_exponent * &base_exponent) % p;
+            while base_exponent != n - 1 && r < s {
+                base_exponent = (&base_exponent * &base_exponent) % n;
                 r = r + 1;
             }
             if r == s {
@@ -131,7 +129,7 @@ mod tests {
     #[test]
     fn miller_rabin_primality_test_should_fail_for_known_composite() {
         let n = 55;
-        assert!(miller_rabin_primality_test(&BigInt::from_usize(n).unwrap()))
+        assert!(!miller_rabin_primality_test(&BigInt::from_usize(n).unwrap()))
     }
 
     #[test]
