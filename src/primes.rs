@@ -7,7 +7,7 @@ use crate::modulo_arithmetic;
 /*
  * Slow and inefficient "naive" implementation of the Sieve of Eratosthenes
  */
-fn primes(up_to: usize) -> Vec<usize> {
+pub(crate) fn primes(up_to: usize) -> Vec<usize> {
     let mut is_prime: Vec<bool> = vec![true; up_to + 1];
     is_prime[0] = false;
     is_prime[1] = false;

@@ -1,8 +1,7 @@
 use num_bigint::{BigInt, Sign};
+use num_traits::One;
 use num_traits::{FromPrimitive, Zero};
-use core::num;
 use std::cmp;
-use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::euclidean;
@@ -26,21 +25,41 @@ fn find_private_key(totient_function: &BigInt, public_key: &BigInt) -> BigInt {
 
 const PUBLIC_EXPONENT: u32 = 65537;
 
-pub(crate) fn generate_keys() -> (Key, Key) {
-    //TODO: This is just an initial version, to be more secure the primes would have to be selected randomly from a range  > Math.pow(2, 64) - Math.pow(2, 128)
-    //i.e. current primes are too small to use in a real encryption scenario
-    let primes_bottom: usize = 16777216; //2^24
-    let primes_top: usize = 4294967296; //2^32
-
+fn generate_random_bytes(size: usize) -> Vec<u8> {
+    let mut result = vec![0u8; size];
     let mut rng = rand::thread_rng();
-    let mut primes_from = rng.gen_range(primes_bottom + 1..primes_top);
-    let segment_size = 1000;
-    let p = BigInt::from_usize(primes::primes_segment(primes_from, primes_from + segment_size).choose(&mut rng).unwrap().clone()).unwrap();
-    let mut q: BigInt = p.clone();
+    rng.fill(&mut result[..]);
+    result
+}
+
+fn is_prime(n: &BigInt, first_primes: &Vec<usize>) -> bool {
+    if first_primes.iter().any(|prime| n % prime == BigInt::zero()) {
+        false
+    } else {
+        primes::miller_rabin_primality_test(n)
+    }
+}
+
+fn find_random_prime(prime_bits: usize, first_primes: &Vec<usize>) -> BigInt {
+    let prime_bytes = prime_bits / 8;
+    let random_number = BigInt::from_bytes_be(Sign::Plus, &generate_random_bytes(prime_bytes));
+    let mut prime_candidate = random_number;
+    if &prime_candidate % 2 == BigInt::zero() {
+        prime_candidate = &prime_candidate + BigInt::one()
+    }
+    while !is_prime(&prime_candidate, &first_primes) {
+        prime_candidate = &prime_candidate + 2;
+    }
+    prime_candidate
+}
+
+pub(crate) fn generate_keys() -> (Key, Key) {
+    let first_primes = primes::primes(1000);
+    let prime_bits = 1024;
+    let p = find_random_prime(prime_bits, &first_primes);
+    let mut q = find_random_prime(prime_bits, &first_primes);
     while q == p {
-        primes_from = rng.gen_range(primes_bottom + 1..primes_top);
-        let new_q = BigInt::from_usize(primes::primes_segment(primes_from, primes_from + segment_size).choose(&mut rng).unwrap().clone()).unwrap();
-        q = new_q;
+        q = find_random_prime(prime_bits, &first_primes);
     }
     let public_exponent: BigInt = BigInt::from_u32(PUBLIC_EXPONENT).unwrap();
 
