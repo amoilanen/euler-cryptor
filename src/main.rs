@@ -9,7 +9,7 @@ mod modulo_arithmetic;
 
 /// Cryptographic utility to help encrypt and decrypt data
 #[derive(Parser)]
-#[command(name = "euler-crypt")]
+#[command(name = "euler-cryptor")]
 #[command(about = "Command line utility to encrypt and decrypt data", long_about = None)]
 struct CliInterface {
     #[command(subcommand)]
