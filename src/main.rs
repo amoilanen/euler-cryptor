@@ -1,4 +1,7 @@
 use clap::{ Parser, Subcommand };
+use std::fs::{ self, File };
+use std::io::Write;
+use std::path::Path;
 
 mod primes;
 mod euclidean;
@@ -27,13 +30,27 @@ enum Command {
     Unknown
 }
 
-
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     let cli = CliInterface::parse();
 
     match cli.command {
-        Command::GenerateKeyPair { output_directory, key_pair_name } =>
-            println!("Generating a new key pair {}, {}", output_directory, key_pair_name),
+        Command::GenerateKeyPair { output_directory, key_pair_name } => {
+            println!("Generating a new key pair {}, {}", output_directory, key_pair_name);
+            fs::create_dir_all(&output_directory)?;
+            let (public_key, private_key) = crypto::generate_keys();
+
+            let public_key_file_name = format!("{}_pub.eulr", key_pair_name);
+            let public_key_file_path = Path::new(&output_directory).join(&public_key_file_name);
+            let mut public_key_file = File::create(public_key_file_path)?;
+            public_key_file.write_all(&public_key.as_bytes())?;
+
+            let private_key_file_name = format!("{}_sec.eulr", key_pair_name);
+            let private_key_file_path = Path::new(&output_directory).join(&private_key_file_name);
+            let mut private_key_file = File::create(private_key_file_path)?;
+            private_key_file.write_all(&private_key.as_bytes())?;
+
+            Ok(())
+        },
         _ => {
             let (public_key, private_key) = crypto::generate_keys();
             let text = "The quick brown fox jumps over the lazy dog";
@@ -42,7 +59,8 @@ fn main() {
             println!("Encrypted text: '{}'", encrypted_text);
             let decrypted = crypto::decrypt_bytes(&encrypted, &private_key);
             let decrypted_text = String::from_utf8_lossy(&decrypted);
-            println!("Decrypted text: '{}'", decrypted_text)
+            println!("Decrypted text: '{}'", decrypted_text);
+            Ok(())
         }
     }
 }
@@ -58,4 +76,5 @@ fn main() {
 
 //TODO: Allow to stream the message contents when encrypting and decrypting
 
+//TODO: Use logging and support the "verbose" option
 //TODO: Avoid using "unwrap"

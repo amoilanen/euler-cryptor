@@ -8,10 +8,36 @@ use crate::euclidean;
 use crate::primes;
 use crate::modulo_arithmetic;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub(crate) struct Key {
     pub(crate) exponent: BigInt,
     pub(crate) modulo: BigInt
+}
+
+impl Key {
+    pub (crate) fn as_bytes(&self) -> Vec<u8> {
+        let mut result: Vec<u8> = Vec::new();
+        let exponent_bytes = self.exponent.to_bytes_be();
+        assert_eq!(exponent_bytes.0, Sign::Plus);
+        let modulo_bytes = self.modulo.to_bytes_be();
+        assert_eq!(modulo_bytes.0, Sign::Plus);
+        result.extend((exponent_bytes.1.len() as u32).to_be_bytes());
+        result.extend((modulo_bytes.1.len() as u32).to_be_bytes());
+        result.extend(exponent_bytes.1);
+        result.extend(modulo_bytes.1);
+        result
+    }
+
+    pub (crate) fn from_bytes(bytes: &Vec<u8>) -> Result<Key, anyhow::Error> {
+        let exponent_length = u32::from_be_bytes(bytes[0..4].try_into()?) as usize;
+        let modulo_length = u32::from_be_bytes(bytes[4..8].try_into()?) as usize;
+        let exponent_bytes: Vec<u8> = bytes[8..(8 + exponent_length)].to_vec();
+        let modulo_bytes: Vec<u8> = bytes[(8 + exponent_length)..(8 + exponent_length + modulo_length)].to_vec();
+        Ok(Key {
+            exponent: BigInt::from_bytes_be(Sign::Plus, &exponent_bytes),
+            modulo: BigInt::from_bytes_be(Sign::Plus, &modulo_bytes)
+        })
+    }
 }
 
 fn find_private_key(totient_function: &BigInt, public_key: &BigInt) -> BigInt {
@@ -96,6 +122,7 @@ fn encrypt_chunk(data: &Vec<u8>, key: &Key, modulo_size_bytes: usize) -> Vec<u8>
 }
 
 pub(crate) fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
+    //TODO: Convert key to bytes instead? Is this expression accurate?
     let modulo_size_bytes = ((key.modulo.bits() + 7) / 8) as usize;
     // leave one byte for ENCRYPTED_PREFIX and one byte to make sure that modulo is not overflown
     let block_size_bytes = cmp::max(modulo_size_bytes - 2, 1);
@@ -114,6 +141,7 @@ pub(crate) fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
 }
 
 pub(crate) fn decrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
+    //TODO: Convert key to bytes instead? Is this expression accurate?
     let modulo_size_bytes = ((key.modulo.bits() + 7) / 8) as usize;
     let mut decrypted: Vec<u8> = Vec::new();
     for chunk in data.chunks(modulo_size_bytes) {
@@ -154,6 +182,24 @@ mod tests {
     fn get_random_bytes(size: usize) -> Vec<u8> {
         let mut rng = rand::thread_rng();
         (0..size).map(|_| rng.gen_range(0..=255)).collect()
+    }
+
+    #[test]
+    fn should_serialize_key() {
+        let key = Key {
+            exponent: BigInt::from_u8(2).unwrap(),
+            modulo: BigInt::from_u8(13).unwrap()
+        };
+        assert_eq!(key.as_bytes(), vec![0u8, 0u8, 0u8, 1u8, 0u8, 0u8, 0u8, 1u8, 2u8, 13u8])
+    }
+
+    #[test]
+    fn should_deserialize_key() {
+        let key_bytes = vec![0u8, 0u8, 0u8, 1u8, 0u8, 0u8, 0u8, 2u8, 2u8, 128u8, 255u8];
+        assert_eq!(Key::from_bytes(&key_bytes).unwrap(), Key {
+            exponent: BigInt::from_u8(2).unwrap(),
+            modulo: BigInt::from_u16(33023).unwrap()
+        })
     }
 
     #[test]
