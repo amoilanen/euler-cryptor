@@ -1,17 +1,50 @@
+use clap::{ Parser, Subcommand };
+
 mod primes;
 mod euclidean;
 mod crypto;
 mod modulo_arithmetic;
 
+//Testing: cargo run -- generate-key-pair --output-directory ./target/keys --key-pair-name mykeys
+
+/// Cryptographic utility to help encrypt and decrypt data
+#[derive(Parser)]
+#[command(name = "euler-crypt")]
+#[command(about = "Command line utility to encrypt and decrypt data", long_about = None)]
+struct CliInterface {
+    #[command(subcommand)]
+    command: Command
+}
+
+#[derive(Subcommand)]
+enum Command {
+    GenerateKeyPair {
+        #[arg(short, long, default_value = ".")]
+        output_directory: String,
+        #[arg(short, long, default_value = "default")]
+        key_pair_name: String
+    },
+    Unknown
+}
+
+
 fn main() {
-    let (public_key, private_key) = crypto::generate_keys();
-    let text = "The quick brown fox jumps over the lazy dog";
-    let encrypted = crypto::encrypt_bytes(&text.as_bytes().to_vec(), &public_key);
-    let encrypted_text = String::from_utf8_lossy(&encrypted);
-    println!("Encrypted text: '{}'", encrypted_text);
-    let decrypted = crypto::decrypt_bytes(&encrypted, &private_key);
-    let decrypted_text = String::from_utf8_lossy(&decrypted);
-    println!("Decrypted text: '{}'", decrypted_text)
+    let cli = CliInterface::parse();
+
+    match cli.command {
+        Command::GenerateKeyPair { output_directory, key_pair_name } =>
+            println!("Generating a new key pair {}, {}", output_directory, key_pair_name),
+        _ => {
+            let (public_key, private_key) = crypto::generate_keys();
+            let text = "The quick brown fox jumps over the lazy dog";
+            let encrypted = crypto::encrypt_bytes(&text.as_bytes().to_vec(), &public_key);
+            let encrypted_text = String::from_utf8_lossy(&encrypted);
+            println!("Encrypted text: '{}'", encrypted_text);
+            let decrypted = crypto::decrypt_bytes(&encrypted, &private_key);
+            let decrypted_text = String::from_utf8_lossy(&decrypted);
+            println!("Decrypted text: '{}'", decrypted_text)
+        }
+    }
 }
 
 //TODO: Add command line interface
