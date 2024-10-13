@@ -9,13 +9,13 @@ use crate::primes;
 use crate::modulo_arithmetic;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Key {
-    pub(crate) exponent: BigInt,
-    pub(crate) modulo: BigInt
+pub struct Key {
+    pub exponent: BigInt,
+    pub modulo: BigInt
 }
 
 impl Key {
-    pub (crate) fn as_bytes(&self) -> Vec<u8> {
+    pub fn as_bytes(&self) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
         let exponent_bytes = self.exponent.to_bytes_be();
         assert_eq!(exponent_bytes.0, Sign::Plus);
@@ -28,7 +28,7 @@ impl Key {
         result
     }
 
-    pub (crate) fn from_bytes(bytes: &Vec<u8>) -> Result<Key, anyhow::Error> {
+    pub fn from_bytes(bytes: &Vec<u8>) -> Result<Key, anyhow::Error> {
         let exponent_length = u32::from_be_bytes(bytes[0..4].try_into()?) as usize;
         let modulo_length = u32::from_be_bytes(bytes[4..8].try_into()?) as usize;
         let exponent_bytes: Vec<u8> = bytes[8..(8 + exponent_length)].to_vec();
@@ -82,7 +82,7 @@ fn find_random_prime(prime_bits: usize, first_primes: &Vec<usize>) -> BigInt {
     prime_candidate
 }
 
-pub(crate) fn generate_keys(key_size: u16) -> (Key, Key) {
+pub fn generate_keys(key_size: u16) -> (Key, Key) {
     let first_primes = primes::primes(1000);
     let prime_bits = (key_size / 2) as usize;
     let p = find_random_prime(prime_bits, &first_primes);
@@ -124,7 +124,7 @@ fn encrypt_chunk(data: &Vec<u8>, key: &Key, modulo_size_bytes: usize) -> Vec<u8>
     result_bytes
 }
 
-pub(crate) fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
+pub fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
     let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
     // leave one byte for ENCRYPTED_PREFIX and one byte to make sure that modulo is not overflown
     let block_size_bytes = cmp::max(modulo_size_bytes - 2, 1);
@@ -142,7 +142,7 @@ pub(crate) fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
     encrypted
 }
 
-pub(crate) fn decrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
+pub fn decrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
     let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
     let mut decrypted: Vec<u8> = Vec::new();
     for chunk in data.chunks(modulo_size_bytes) {

@@ -2,11 +2,7 @@ use clap::{ Parser, Subcommand };
 use std::fs::{ self, File };
 use std::io::Write;
 use std::path::{ Path, PathBuf };
-
-mod primes;
-mod euclidean;
-mod crypto;
-mod modulo_arithmetic;
+use euler_cryptor::crypto;
 
 /// Cryptographic utility to help encrypt and decrypt data
 #[derive(Parser)]
@@ -51,7 +47,7 @@ fn main() -> Result<(), anyhow::Error> {
     match cli.command {
         Command::GenerateKeyPair { key_directory, key_pair_name, key_size } => {
             fs::create_dir_all(&key_directory)?;
-            let (public_key, private_key) = crypto::generate_keys(key_size);
+            let (public_key, private_key) = crate::crypto::generate_keys(key_size);
             let public_key_path = create_key_path(&key_directory, &key_pair_name, "pub");
             save_key_to(&public_key, public_key_path)?;
             let private_key_path = create_key_path(&key_directory, &key_pair_name, "sec");
@@ -74,7 +70,7 @@ fn main() -> Result<(), anyhow::Error> {
 }
 
 //TODO: Add command line interface
-// - Generate public and private keys and store them in some format (base-64 encoded) in two separate files
+// - Generate public and private keys and store them in some format (base-64 encoded) in two separate files - OK
 // - Encrypt Vec<u8> input using the provided key (can be either public or private due to the symmetric nature of the algorithm)
 // - Decrypt Vec<u8> input using the provided key (can be either public or private due to the symmetric nature of the algorithm)
 
