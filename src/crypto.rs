@@ -68,7 +68,10 @@ fn is_prime(n: &BigInt, first_primes: &Vec<usize>) -> bool {
 
 fn find_random_prime(prime_bits: usize, first_primes: &Vec<usize>) -> BigInt {
     let prime_bytes = prime_bits / 8;
-    let random_number = BigInt::from_bytes_be(Sign::Plus, &generate_random_bytes(prime_bytes));
+    let mut random_number = BigInt::from_bytes_be(Sign::Plus, &generate_random_bytes(prime_bytes));
+    //Making sure that the number is large enough
+    let bit_mask = BigInt::one() << (prime_bits - 1);
+    random_number = random_number | bit_mask;
     let mut prime_candidate = random_number;
     if &prime_candidate % 2 == BigInt::zero() {
         prime_candidate = &prime_candidate + BigInt::one()
@@ -79,9 +82,9 @@ fn find_random_prime(prime_bits: usize, first_primes: &Vec<usize>) -> BigInt {
     prime_candidate
 }
 
-pub(crate) fn generate_keys() -> (Key, Key) {
+pub(crate) fn generate_keys(key_size: u16) -> (Key, Key) {
     let first_primes = primes::primes(1000);
-    let prime_bits = 1024;
+    let prime_bits = (key_size / 2) as usize;
     let p = find_random_prime(prime_bits, &first_primes);
     let mut q = find_random_prime(prime_bits, &first_primes);
     while q == p {
@@ -122,8 +125,7 @@ fn encrypt_chunk(data: &Vec<u8>, key: &Key, modulo_size_bytes: usize) -> Vec<u8>
 }
 
 pub(crate) fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
-    //TODO: Convert key to bytes instead? Is this expression accurate?
-    let modulo_size_bytes = ((key.modulo.bits() + 7) / 8) as usize;
+    let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
     // leave one byte for ENCRYPTED_PREFIX and one byte to make sure that modulo is not overflown
     let block_size_bytes = cmp::max(modulo_size_bytes - 2, 1);
     let mut all_bytes = Vec::new();
@@ -141,8 +143,7 @@ pub(crate) fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
 }
 
 pub(crate) fn decrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
-    //TODO: Convert key to bytes instead? Is this expression accurate?
-    let modulo_size_bytes = ((key.modulo.bits() + 7) / 8) as usize;
+    let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
     let mut decrypted: Vec<u8> = Vec::new();
     for chunk in data.chunks(modulo_size_bytes) {
         let decrypted_data = encrypt_chunk(&chunk.to_vec(), &key, modulo_size_bytes);
@@ -176,7 +177,7 @@ mod tests {
     }
 
     fn generated_keys() -> (Key, Key) {
-        generate_keys()
+        generate_keys(2048)
     }
 
     fn get_random_bytes(size: usize) -> Vec<u8> {

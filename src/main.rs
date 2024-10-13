@@ -1,14 +1,12 @@
 use clap::{ Parser, Subcommand };
 use std::fs::{ self, File };
 use std::io::Write;
-use std::path::Path;
+use std::path::{ Path, PathBuf };
 
 mod primes;
 mod euclidean;
 mod crypto;
 mod modulo_arithmetic;
-
-//Testing: cargo run -- generate-key-pair --output-directory ./target/keys --key-pair-name mykeys
 
 /// Cryptographic utility to help encrypt and decrypt data
 #[derive(Parser)]
@@ -21,38 +19,48 @@ struct CliInterface {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Generate a key pair (public and private keys)
     GenerateKeyPair {
-        #[arg(short, long, default_value = ".")]
-        output_directory: String,
-        #[arg(short, long, default_value = "default")]
-        key_pair_name: String
+        /// Name of the directory where the keys should be generated
+        #[arg(long, default_value = ".")]
+        key_directory: String,
+        /// Name of the key pair to be generated
+        #[arg(long, default_value = "default")]
+        key_pair_name: String,
+        /// Size of the key, 2048 is a good default, for better but slower encryption select 3072 or 4096
+        #[arg(long, default_value = "2048")]
+        key_size: u16
     },
     Unknown
+}
+
+fn save_key_to(key: &crypto::Key, key_path: PathBuf) -> Result<(), anyhow::Error> {
+    let mut public_key_file = File::create(key_path)?;
+    public_key_file.write_all(&key.as_bytes())?;
+    Ok(())
+}
+
+fn create_key_path(key_directory: &str, key_pair_name: &str, key_prefix: &str) -> PathBuf {
+    let public_key_file_name = format!("{}_{}.elr", key_pair_name, key_prefix);
+    Path::new(&key_directory).join(&public_key_file_name)
 }
 
 fn main() -> Result<(), anyhow::Error> {
     let cli = CliInterface::parse();
 
     match cli.command {
-        Command::GenerateKeyPair { output_directory, key_pair_name } => {
-            println!("Generating a new key pair {}, {}", output_directory, key_pair_name);
-            fs::create_dir_all(&output_directory)?;
-            let (public_key, private_key) = crypto::generate_keys();
-
-            let public_key_file_name = format!("{}_pub.eulr", key_pair_name);
-            let public_key_file_path = Path::new(&output_directory).join(&public_key_file_name);
-            let mut public_key_file = File::create(public_key_file_path)?;
-            public_key_file.write_all(&public_key.as_bytes())?;
-
-            let private_key_file_name = format!("{}_sec.eulr", key_pair_name);
-            let private_key_file_path = Path::new(&output_directory).join(&private_key_file_name);
-            let mut private_key_file = File::create(private_key_file_path)?;
-            private_key_file.write_all(&private_key.as_bytes())?;
-
+        Command::GenerateKeyPair { key_directory, key_pair_name, key_size } => {
+            fs::create_dir_all(&key_directory)?;
+            let (public_key, private_key) = crypto::generate_keys(key_size);
+            let public_key_path = create_key_path(&key_directory, &key_pair_name, "pub");
+            save_key_to(&public_key, public_key_path)?;
+            let private_key_path = create_key_path(&key_directory, &key_pair_name, "sec");
+            save_key_to(&private_key, private_key_path)?;
+            println!("Generated a new key pair {}, {}", key_directory, key_pair_name);
             Ok(())
         },
         _ => {
-            let (public_key, private_key) = crypto::generate_keys();
+            let (public_key, private_key) = crypto::generate_keys(2048);
             let text = "The quick brown fox jumps over the lazy dog";
             let encrypted = crypto::encrypt_bytes(&text.as_bytes().to_vec(), &public_key);
             let encrypted_text = String::from_utf8_lossy(&encrypted);
