@@ -6,5 +6,21 @@ RSA-implementation in Rust, provides a command line tool and a libary
 
 ##### Generating keys
 
-`$euler-crypt generate-key-pair --key-directory ./keys --key-pair-name mykeys`
+```bash
+$ euler-crypt generate-key-pair --key-directory ./keys --key-pair-name mykeys
+```
+
+##### Encrypting file contents
+
+```bash
+$ echo $(cat file.txt) | euler-crypt encrypt --key-path ./keys/mykeys_pub.elr > encrypted_file.txt
+```
+
+##### Decrypting file contents
+
+```bash
+$ echo $(cat encrypted_file.txt) | euler-crypt decrypt --key-path ./keys/mykeys_sec.elr > file.txt
+```
+
+
 

@@ -26,13 +26,18 @@ enum Command {
         #[arg(long, default_value = "2048")]
         key_size: u16
     },
-    /// Use key to encrypt or decrypt the contents read from the standard input
+    /// Use key to encrypt the contents read from the standard input
     Encrypt {
         /// Path to the key to be used
         #[arg(long, default_value = "default")]
         key_path: String,
     },
-    Unknown
+    /// Use key to decrypt the contents read from the standard input
+    Decrypt {
+        /// Path to the key to be used
+        #[arg(long, default_value = "default")]
+        key_path: String,
+    }
 }
 
 fn main() -> Result<(), anyhow::Error> {
@@ -55,16 +60,12 @@ fn main() -> Result<(), anyhow::Error> {
             let encrypted = euler_cryptor::crypto::encrypt_bytes(&input, &key);
             euler_cryptor::io::write_to_stdout(&encrypted)?;
             Ok(())
-        }
-        _ => {
-            let (public_key, private_key) = crypto::generate_keys(2048);
-            let text = "The quick brown fox jumps over the lazy dog";
-            let encrypted = crypto::encrypt_bytes(&text.as_bytes().to_vec(), &public_key);
-            let encrypted_text = String::from_utf8_lossy(&encrypted);
-            println!("Encrypted text: '{}'", encrypted_text);
-            let decrypted = crypto::decrypt_bytes(&encrypted, &private_key);
-            let decrypted_text = String::from_utf8_lossy(&decrypted);
-            println!("Decrypted text: '{}'", decrypted_text);
+        },
+        Command::Decrypt { key_path } => {
+            let input = euler_cryptor::io::read_from_stdin()?;
+            let key = euler_cryptor::io::read_key_from(&Path::new(&key_path))?;
+            let decrypted = euler_cryptor::crypto::decrypt_bytes(&input, &key);
+            euler_cryptor::io::write_to_stdout(&decrypted)?;
             Ok(())
         }
     }
@@ -79,7 +80,7 @@ fn main() -> Result<(), anyhow::Error> {
 
 //TODO: Use logging and support the "verbose" option
 //TODO: Avoid using "unwrap"
-//TODO: Allow to stream the message contents when encrypting and decrypting
+//TODO: Allow to stream the message contents when encrypting and decrypting (this should allow to encrypt and decrypt larger files)
 
 //TODO: Add examples:
 // - How the command line tool can be used to sign and verify messages (signing with the private key)
