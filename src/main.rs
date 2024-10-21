@@ -57,52 +57,25 @@ fn main() -> Result<(), anyhow::Error> {
         Command::Encrypt { key_path } => {
             let mut input = euler_cryptor::io::stdin_stream()?;
             let key = euler_cryptor::io::read_key_from(&Path::new(&key_path))?;
-            let chunk_size = euler_cryptor::crypto::encryption_block_size(&key);
-            let mut buffer = vec![0u8; chunk_size];
-            let mut read_bytes_size = 1;
-            while read_bytes_size != 0 {
-                read_bytes_size = input.read(&mut buffer)?;
-                let read_bytes = buffer[0..read_bytes_size].to_vec();
-                /*
-                if read_bytes_size != chunk_size {
-                    println!("Expected to encrypt a chunk of {} bytes, but read {} bytes", chunk_size, read_bytes_size);
-                }
-                */
-                let encrypted = euler_cryptor::crypto::encrypt_bytes(&read_bytes, &key);
-                euler_cryptor::io::write_to_stdout(&encrypted)?;
-            }
-            Ok(())
+            let chunk_size = euler_cryptor::crypto::encryption_chunk_size(&key);
+            euler_cryptor::io::process_chunks_of(&mut input, chunk_size, |chunk| {
+                let encrypted = euler_cryptor::crypto::encrypt_bytes(&chunk, &key);
+                euler_cryptor::io::write_to_stdout(&encrypted)
+            })
         },
         Command::Decrypt { key_path } => {
             let mut input = euler_cryptor::io::stdin_stream()?;
             let key = euler_cryptor::io::read_key_from(&Path::new(&key_path))?;
-            let chunk_size = euler_cryptor::crypto::decryption_block_size(&key);
-            println!("chunk_size = {}", chunk_size);
-            let mut buffer = vec![0u8; chunk_size];
-            let mut read_buffer_size = 0;
-            let mut read_bytes_size = 1;
-            while read_bytes_size != 0 {
-                read_bytes_size = input.read(&mut buffer[read_buffer_size..])?;
-                read_buffer_size = read_buffer_size + read_bytes_size;
-                if read_bytes_size == 0 {
-                    if read_buffer_size > 0 {
-                        let read_bytes = buffer[0..read_buffer_size].to_vec();
-                        read_buffer_size = 0;
-                        let decrypted = euler_cryptor::crypto::decrypt_bytes(&read_bytes, &key);
-                        euler_cryptor::io::write_to_stdout(&decrypted)?;
-                    }
-                } else if read_buffer_size == chunk_size {
-                    let read_bytes = buffer[0..read_buffer_size].to_vec();
-                    read_buffer_size = 0;
-                    let decrypted = euler_cryptor::crypto::decrypt_bytes(&read_bytes, &key);
-                    euler_cryptor::io::write_to_stdout(&decrypted)?;
-                }
-            }
-            Ok(())
+            let chunk_size = euler_cryptor::crypto::decryption_chunk_size(&key);
+            euler_cryptor::io::process_chunks_of(&mut input, chunk_size, |chunk| {
+                let decrypted = euler_cryptor::crypto::decrypt_bytes(&chunk, &key);
+                euler_cryptor::io::write_to_stdout(&decrypted)
+            })
         }
     }
 }
 
+//TODO: Allow to provide input to the "encrypt" and "decrypt" commands as a file, option "input" which might be missing. If missing, input is read from stdin
 //TODO: Optimize encryption and decryption of larger files
 //TODO: Allow to stream the message contents when encrypting and decrypting (this should allow to encrypt and decrypt larger files)
 //TODO: Use the standard pkcs#8 structure for storing the keys

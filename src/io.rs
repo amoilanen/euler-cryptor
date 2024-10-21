@@ -21,17 +21,28 @@ pub fn create_key_path(key_directory: &str, key_pair_name: &str, key_prefix: &st
     Path::new(&key_directory).join(&public_key_file_name)
 }
 
-pub fn read_from_stdin() -> Result<Vec<u8>, anyhow::Error> {
-    let mut buffer: Vec<u8> = Vec::new();
-    io::stdin().lock().read_to_end(&mut buffer)?;
-    Ok(buffer)
-}
-
 pub fn stdin_stream() -> Result<BufReader<io::StdinLock<'static>>, anyhow::Error> {
     Ok(BufReader::new(io::stdin().lock()))
+}
+
+pub fn process_chunks_of<R: Read, F>(input: &mut BufReader<R>, chunk_size: usize, chunk_processor: F) -> Result<(), anyhow::Error>
+where F: Fn(&Vec<u8>) -> Result<(), anyhow::Error> {
+    let mut buffer = vec![0u8; chunk_size];
+    let mut read_buffer_size = 0;
+    let mut read_bytes_size = 1;
+    while read_bytes_size != 0 {
+        read_bytes_size = input.read(&mut buffer[read_buffer_size..])?;
+        read_buffer_size = read_buffer_size + read_bytes_size;
+        let has_finished_reading_chunk = (read_bytes_size == 0 && read_buffer_size > 0) || (read_buffer_size == chunk_size);
+        if has_finished_reading_chunk {
+            let read_bytes = buffer[0..read_buffer_size].to_vec();
+            read_buffer_size = 0;
+            chunk_processor(&read_bytes)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn write_to_stdout(bytes: &Vec<u8>) -> Result<(), anyhow::Error> {
     io::stdout().lock().write_all(bytes).map_err(Error::from)
 }
-

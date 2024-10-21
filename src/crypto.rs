@@ -124,13 +124,13 @@ fn encrypt_chunk(data: &Vec<u8>, key: &Key, modulo_size_bytes: usize) -> Vec<u8>
     result_bytes
 }
 
-pub fn encryption_block_size(key: &Key) -> usize {
+pub fn encryption_chunk_size(key: &Key) -> usize {
     let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
     // leave one byte for ENCRYPTED_PREFIX and one byte to make sure that modulo is not overflown
     cmp::max(modulo_size_bytes - 2, 1)
 }
 
-pub fn decryption_block_size(key:&Key) -> usize {
+pub fn decryption_chunk_size(key:&Key) -> usize {
     key.modulo.to_bytes_be().1.len()
 }
 
