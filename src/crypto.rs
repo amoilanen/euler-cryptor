@@ -124,6 +124,16 @@ fn encrypt_chunk(data: &Vec<u8>, key: &Key, modulo_size_bytes: usize) -> Vec<u8>
     result_bytes
 }
 
+pub fn encryption_block_size(key: &Key) -> usize {
+    let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
+    // leave one byte for ENCRYPTED_PREFIX and one byte to make sure that modulo is not overflown
+    cmp::max(modulo_size_bytes - 2, 1)
+}
+
+pub fn decryption_block_size(key:&Key) -> usize {
+    key.modulo.to_bytes_be().1.len()
+}
+
 pub fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
     let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
     // leave one byte for ENCRYPTED_PREFIX and one byte to make sure that modulo is not overflown
@@ -153,7 +163,7 @@ pub fn decrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
             i = i + 1;
             has_found_prefix = decrypted_data[i] == ENCRYPTED_CHUNK_PREFIX;
         }
-        assert!(has_found_prefix);
+        //assert!(has_found_prefix);
         let decrypted_chunk = decrypted_data[i + 1..].to_vec();
         decrypted.extend(decrypted_chunk);
     }

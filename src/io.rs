@@ -1,4 +1,4 @@
-use std::io::{self, Read};
+use std::io::{self, Read, BufReader};
 use std::path::{ Path, PathBuf };
 use std::fs::{ self, File };
 use std::io::Write;
@@ -25,6 +25,10 @@ pub fn read_from_stdin() -> Result<Vec<u8>, anyhow::Error> {
     let mut buffer: Vec<u8> = Vec::new();
     io::stdin().lock().read_to_end(&mut buffer)?;
     Ok(buffer)
+}
+
+pub fn stdin_stream() -> Result<BufReader<io::StdinLock<'static>>, anyhow::Error> {
+    Ok(BufReader::new(io::stdin().lock()))
 }
 
 pub fn write_to_stdout(bytes: &Vec<u8>) -> Result<(), anyhow::Error> {
