@@ -75,10 +75,11 @@ fn main() -> Result<(), anyhow::Error> {
     }
 }
 
+//TODO: Use the standard pkcs#8 structure for storing the keys
+//TODO: Use PEM over pkcs#8 for storing public and private keys
 //TODO: Allow to provide input to the "encrypt" and "decrypt" commands as a file, option "input" which might be missing. If missing, input is read from stdin
 //TODO: Optimize encryption and decryption of larger files
 //TODO: Allow to stream the message contents when encrypting and decrypting (this should allow to encrypt and decrypt larger files)
-//TODO: Use the standard pkcs#8 structure for storing the keys
 
 //TODO: Use logging and support the "verbose" option
 //TODO: Avoid using "unwrap"

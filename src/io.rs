@@ -7,12 +7,12 @@ use crate::crypto;
 
 pub fn read_key_from(path: &Path) -> Result<crypto::Key, anyhow::Error> {
     let bytes = fs::read(path)?;
-    crate::crypto::Key::from_bytes(&bytes)
+    crate::crypto::Key::deserialize(&bytes)
 }
 
 pub fn save_key_to(key: &crypto::Key, key_path: &Path) -> Result<(), anyhow::Error> {
     let mut public_key_file = File::create(key_path)?;
-    public_key_file.write_all(&key.as_bytes())?;
+    public_key_file.write_all(&key.serialize())?;
     Ok(())
 }
 

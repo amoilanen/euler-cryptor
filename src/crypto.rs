@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result, Error};
 use num_bigint::{BigInt, Sign};
 use num_traits::One;
 use num_traits::{FromPrimitive, Zero};
@@ -7,6 +8,7 @@ use rand::Rng;
 use crate::euclidean;
 use crate::primes;
 use crate::modulo_arithmetic;
+use crate::pkcs8::PrivateKeyInfo;
 
 #[derive(Debug, PartialEq)]
 pub struct Key {
@@ -15,7 +17,18 @@ pub struct Key {
 }
 
 impl Key {
-    pub fn as_bytes(&self) -> Vec<u8> {
+
+    pub fn serialize(&self) -> Vec<u8> {
+        PrivateKeyInfo::wrap(&self).serialize()
+    }
+
+    pub fn deserialize(input: &[u8]) -> Result<Key, anyhow::Error> {
+        let private_key_info = PrivateKeyInfo::deserialize(input)
+            .map_err(|err| anyhow!("Failed to deserialize {}", err))?;
+        Key::from_bytes(&private_key_info.private_key)
+    }
+
+    pub(crate) fn as_bytes(&self) -> Vec<u8> {
         let mut result: Vec<u8> = Vec::new();
         let exponent_bytes = self.exponent.to_bytes_be();
         assert_eq!(exponent_bytes.0, Sign::Plus);
@@ -28,7 +41,7 @@ impl Key {
         result
     }
 
-    pub fn from_bytes(bytes: &Vec<u8>) -> Result<Key, anyhow::Error> {
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Key, anyhow::Error> {
         let exponent_length = u32::from_be_bytes(bytes[0..4].try_into()?) as usize;
         let modulo_length = u32::from_be_bytes(bytes[4..8].try_into()?) as usize;
         let exponent_bytes: Vec<u8> = bytes[8..(8 + exponent_length)].to_vec();
