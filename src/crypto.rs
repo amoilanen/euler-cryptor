@@ -5,6 +5,7 @@ use num_traits::{FromPrimitive, Zero};
 use std::cmp;
 use rand::Rng;
 
+use crate::pem;
 use crate::euclidean;
 use crate::primes;
 use crate::modulo_arithmetic;
@@ -16,14 +17,24 @@ pub struct Key {
     pub modulo: BigInt
 }
 
+#[derive(Debug, PartialEq)]
+pub enum KeyType {
+    Public,
+    Private
+}
+
 impl Key {
 
     pub fn serialize(&self) -> Vec<u8> {
-        PrivateKeyInfo::wrap(&self).serialize()
+        //TODO: Support different serialization for a public key
+        let key_data = PrivateKeyInfo::wrap(&self).serialize();
+        pem::serialize(&key_data, &KeyType::Private)
     }
 
     pub fn deserialize(input: &[u8]) -> Result<Key, anyhow::Error> {
-        let private_key_info = PrivateKeyInfo::deserialize(input)
+        //TODO: Support different deserialization for a public key
+        let (key_data, key_type) = pem::deserialize(input)?;
+        let private_key_info = PrivateKeyInfo::deserialize(&key_data)
             .map_err(|err| anyhow!("Failed to deserialize {}", err))?;
         Key::from_bytes(&private_key_info.private_key)
     }
