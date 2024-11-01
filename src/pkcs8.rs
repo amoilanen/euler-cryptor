@@ -1,8 +1,8 @@
 use crate::crypto::Key;
-use anyhow::{Result, Error};
+use anyhow::Result;
 use yasna::{self, models::ObjectIdentifier};
 
-// https://datatracker.ietf.org/doc/html/rfc5208#appendix-A
+// PKCS#8 https://datatracker.ietf.org/doc/html/rfc5208#appendix-A
 #[derive(Default)]
 pub(crate) struct PrivateKeyInfo {
     pub(crate) version: u32,

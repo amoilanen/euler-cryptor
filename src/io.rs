@@ -17,8 +17,8 @@ pub fn save_key_to(key: &crypto::Key, key_path: &Path) -> Result<(), anyhow::Err
 }
 
 pub fn create_key_path(key_directory: &str, key_pair_name: &str, key_prefix: &str) -> PathBuf {
-    let public_key_file_name = format!("{}_{}.elr", key_pair_name, key_prefix);
-    Path::new(&key_directory).join(&public_key_file_name)
+    let key_file_name = format!("{}_{}.pem", key_pair_name, key_prefix);
+    Path::new(&key_directory).join(&key_file_name)
 }
 
 pub fn stdin_stream() -> Result<BufReader<io::StdinLock<'static>>, anyhow::Error> {

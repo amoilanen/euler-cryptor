@@ -1,23 +1,26 @@
-use anyhow::{anyhow, Result, Error};
+use anyhow::{anyhow, Result};
 use num_bigint::{BigInt, Sign};
 use num_traits::One;
 use num_traits::{FromPrimitive, Zero};
 use std::cmp;
 use rand::Rng;
+use yasna::{self, ASN1Error};
 
 use crate::pem;
 use crate::euclidean;
 use crate::primes;
 use crate::modulo_arithmetic;
 use crate::pkcs8::PrivateKeyInfo;
+use crate::spki::SubjectPublicKeyInfo;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Key {
     pub exponent: BigInt,
-    pub modulo: BigInt
+    pub modulo: BigInt,
+    pub key_type: KeyType
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum KeyType {
     Public,
     Private
@@ -26,40 +29,54 @@ pub enum KeyType {
 impl Key {
 
     pub fn serialize(&self) -> Vec<u8> {
-        //TODO: Support different serialization for a public key
-        let key_data = PrivateKeyInfo::wrap(&self).serialize();
-        pem::serialize(&key_data, &KeyType::Private)
+        let key_data = match self.key_type {
+            KeyType::Private => {
+                PrivateKeyInfo::wrap(&self).serialize()
+            },
+            KeyType::Public => {
+                SubjectPublicKeyInfo::wrap(&self).serialize()
+            }
+        };
+        pem::serialize(&key_data, &self.key_type)
     }
 
     pub fn deserialize(input: &[u8]) -> Result<Key, anyhow::Error> {
-        //TODO: Support different deserialization for a public key
         let (key_data, key_type) = pem::deserialize(input)?;
-        let private_key_info = PrivateKeyInfo::deserialize(&key_data)
-            .map_err(|err| anyhow!("Failed to deserialize {}", err))?;
-        Key::from_bytes(&private_key_info.private_key)
+        match key_type {
+            KeyType::Private => {
+                let private_key_info = PrivateKeyInfo::deserialize(&key_data)
+                    .map_err(|err| anyhow!("Failed to deserialize {}", err))?;
+                Key::from_bytes(&private_key_info.private_key, key_type).map_err(|err| anyhow!("Failed to deserialize private key {}", err))
+            },
+            KeyType::Public => {
+                let public_key_info = SubjectPublicKeyInfo::deserialize(&key_data)
+                    .map_err(|err| anyhow!("Failed to deserialize {}", err))?;
+                Ok(public_key_info.public_key)
+            }
+        }
+
     }
 
     pub(crate) fn as_bytes(&self) -> Vec<u8> {
-        let mut result: Vec<u8> = Vec::new();
-        let exponent_bytes = self.exponent.to_bytes_be();
-        assert_eq!(exponent_bytes.0, Sign::Plus);
-        let modulo_bytes = self.modulo.to_bytes_be();
-        assert_eq!(modulo_bytes.0, Sign::Plus);
-        result.extend((exponent_bytes.1.len() as u32).to_be_bytes());
-        result.extend((modulo_bytes.1.len() as u32).to_be_bytes());
-        result.extend(exponent_bytes.1);
-        result.extend(modulo_bytes.1);
-        result
+        yasna::construct_der(|writer| {
+            writer.write_sequence(|writer| {
+                writer.next().write_bigint_bytes(&self.modulo.to_bytes_be().1, true);
+                writer.next().write_bigint_bytes(&self.exponent.to_bytes_be().1, true);
+            })
+        })
     }
 
-    pub(crate) fn from_bytes(bytes: &[u8]) -> Result<Key, anyhow::Error> {
-        let exponent_length = u32::from_be_bytes(bytes[0..4].try_into()?) as usize;
-        let modulo_length = u32::from_be_bytes(bytes[4..8].try_into()?) as usize;
-        let exponent_bytes: Vec<u8> = bytes[8..(8 + exponent_length)].to_vec();
-        let modulo_bytes: Vec<u8> = bytes[(8 + exponent_length)..(8 + exponent_length + modulo_length)].to_vec();
-        Ok(Key {
-            exponent: BigInt::from_bytes_be(Sign::Plus, &exponent_bytes),
-            modulo: BigInt::from_bytes_be(Sign::Plus, &modulo_bytes)
+    pub(crate) fn from_bytes(bytes: &[u8], key_type: KeyType) -> Result<Key, ASN1Error> {
+        yasna::parse_der(bytes, |reader| {
+            reader.read_sequence(|reader| {
+                let modulo = BigInt::from_bytes_be(Sign::Plus, &reader.next().read_bytes()?);
+                let exponent = BigInt::from_bytes_be(Sign::Plus, &reader.next().read_bytes()?);
+                Ok(Key {
+                    exponent,
+                    modulo,
+                    key_type
+                })
+            })
         })
     }
 }
@@ -123,11 +140,13 @@ pub fn generate_keys(key_size: u16) -> (Key, Key) {
 
     let public_key = Key {
         exponent: public_exponent,
-        modulo: n.clone()
+        modulo: n.clone(),
+        key_type: KeyType::Public
     };
     let private_key = Key {
         exponent: private_exponent,
-        modulo: n
+        modulo: n,
+        key_type: KeyType::Private
     };
     (public_key, private_key)
 }
@@ -201,11 +220,13 @@ mod tests {
     fn predefined_keys() -> (Key, Key) {
         let public_key = Key {
             exponent: BigInt::from_u32(65537).unwrap(),
-            modulo: BigInt::from_u64(404790586766519).unwrap()
+            modulo: BigInt::from_u64(404790586766519).unwrap(),
+            key_type: KeyType::Public
         };
         let private_key = Key {
             exponent: BigInt::from_u64(375946200922409).unwrap(),
-            modulo: BigInt::from_u64(404790586766519).unwrap()
+            modulo: BigInt::from_u64(404790586766519).unwrap(),
+            key_type: KeyType::Private
         };
         (public_key, private_key)
     }
@@ -223,7 +244,8 @@ mod tests {
     fn should_serialize_key() {
         let key = Key {
             exponent: BigInt::from_u8(2).unwrap(),
-            modulo: BigInt::from_u8(13).unwrap()
+            modulo: BigInt::from_u8(13).unwrap(),
+            key_type: KeyType::Public
         };
         assert_eq!(key.as_bytes(), vec![0u8, 0u8, 0u8, 1u8, 0u8, 0u8, 0u8, 1u8, 2u8, 13u8])
     }
@@ -231,9 +253,10 @@ mod tests {
     #[test]
     fn should_deserialize_key() {
         let key_bytes = vec![0u8, 0u8, 0u8, 1u8, 0u8, 0u8, 0u8, 2u8, 2u8, 128u8, 255u8];
-        assert_eq!(Key::from_bytes(&key_bytes).unwrap(), Key {
+        assert_eq!(Key::from_bytes(&key_bytes, KeyType::Public).unwrap(), Key {
             exponent: BigInt::from_u8(2).unwrap(),
-            modulo: BigInt::from_u16(33023).unwrap()
+            modulo: BigInt::from_u16(33023).unwrap(),
+            key_type: KeyType::Public
         })
     }
 

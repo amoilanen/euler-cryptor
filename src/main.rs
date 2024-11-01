@@ -42,8 +42,11 @@ enum Command {
 
 fn main() -> Result<(), anyhow::Error> {
     let cli = CliInterface::parse();
+    let command = cli.command;
 
-    match cli.command {
+    //let command = Command::Encrypt { key_path: "./target/keys/mykeys_pub.pem".to_string() };
+
+    match command {
         Command::GenerateKeyPair { key_directory, key_pair_name, key_size } => {
             fs::create_dir_all(&key_directory)?;
             let (public_key, private_key) = euler_cryptor::crypto::generate_keys(key_size);
