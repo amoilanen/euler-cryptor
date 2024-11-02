@@ -54,14 +54,15 @@ impl Key {
                 Ok(public_key_info.public_key)
             }
         }
-
     }
 
     pub(crate) fn as_bytes(&self) -> Vec<u8> {
         yasna::construct_der(|writer| {
             writer.write_sequence(|writer| {
-                writer.next().write_bigint_bytes(&self.modulo.to_bytes_be().1, true);
-                writer.next().write_bigint_bytes(&self.exponent.to_bytes_be().1, true);
+                let (modulo_sign, modulo_bytes) = self.modulo.to_bytes_be();
+                let (exponent_sign, exponent_bytes) = self.exponent.to_bytes_be();
+                writer.next().write_bigint_bytes(&modulo_bytes, modulo_sign == Sign::Plus);
+                writer.next().write_bigint_bytes(&exponent_bytes, exponent_sign == Sign::Plus);
             })
         })
     }
@@ -69,8 +70,10 @@ impl Key {
     pub(crate) fn from_bytes(bytes: &[u8], key_type: KeyType) -> Result<Key, ASN1Error> {
         yasna::parse_der(bytes, |reader| {
             reader.read_sequence(|reader| {
-                let modulo = BigInt::from_bytes_be(Sign::Plus, &reader.next().read_bytes()?);
-                let exponent = BigInt::from_bytes_be(Sign::Plus, &reader.next().read_bytes()?);
+                let (modulo_bytes, modulo_positive) = reader.next().read_bigint_bytes()?;
+                let (exponent_bytes, exponent_positive) = reader.next().read_bigint_bytes()?;
+                let modulo = BigInt::from_bytes_be(if modulo_positive { Sign::Plus } else { Sign::Minus } , &modulo_bytes);
+                let exponent = BigInt::from_bytes_be(if exponent_positive { Sign::Plus } else { Sign::Minus } , &exponent_bytes);
                 Ok(Key {
                     exponent,
                     modulo,
@@ -258,6 +261,16 @@ mod tests {
             modulo: BigInt::from_u16(33023).unwrap(),
             key_type: KeyType::Public
         })
+    }
+
+    #[test]
+    fn should_return_same_key_when_running_as_bytes_from_bytes_in_succession() {
+        let key = Key {
+            exponent: BigInt::from_u8(2).unwrap(),
+            modulo: BigInt::from_u8(13).unwrap(),
+            key_type: KeyType::Public
+        };
+        assert_eq!(Key::from_bytes(&key.as_bytes(), key.key_type.clone()).unwrap(), key)
     }
 
     #[test]

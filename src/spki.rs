@@ -36,7 +36,9 @@ impl SubjectPublicKeyInfo {
                 let public_key = reader.next().read_bitvec_bytes()?.0;
                 Ok(SubjectPublicKeyInfo {
                     public_key_algorithm,
-                    public_key: Key::from_bytes(&public_key, KeyType::Public)?
+                    public_key: Key::from_bytes(&public_key, KeyType::Public).map_err(|_| {
+                        yasna::ASN1Error::new(yasna::ASN1ErrorKind::Invalid)
+                    })?
                 })
             })
         })
