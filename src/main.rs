@@ -1,6 +1,6 @@
 use clap::{ Parser, Subcommand };
-use std::fs::{self, read};
-use std::io::Read;
+use std::fs;
+use std::io::{Write, BufRead};
 use std::path::Path;
 
 /// Cryptographic utility to help encrypt and decrypt data
@@ -31,20 +31,30 @@ enum Command {
         /// Path to the key to be used
         #[arg(long, default_value = "default")]
         key_path: String,
+        /// Path to the file to be encrypted
+        #[arg(long)]
+        input: Option<String>,
+        /// Path to the file to store the results in
+        #[arg(long)]
+        output: Option<String>,
     },
     /// Use key to decrypt the contents read from the standard input
     Decrypt {
         /// Path to the key to be used
         #[arg(long, default_value = "default")]
         key_path: String,
+        /// Path to the file to be decrypted
+        #[arg(long)]
+        input: Option<String>,
+        /// Path to the file to store the results in
+        #[arg(long)]
+        output: Option<String>,
     }
 }
 
 fn main() -> Result<(), anyhow::Error> {
     let cli = CliInterface::parse();
     let command = cli.command;
-
-    //let command = Command::Encrypt { key_path: "./target/keys/mykeys_pub.pem".to_string() };
 
     match command {
         Command::GenerateKeyPair { key_directory, key_pair_name, key_size } => {
@@ -57,30 +67,49 @@ fn main() -> Result<(), anyhow::Error> {
             println!("Generated a new key pair {}, {}", key_directory, key_pair_name);
             Ok(())
         },
-        Command::Encrypt { key_path } => {
-            let mut input = euler_cryptor::io::stdin_stream()?;
+        Command::Encrypt { key_path, input, output } => {
+            let mut input_reader: Box<dyn BufRead> = match input {
+                Some(input_path) =>
+                    euler_cryptor::io::file_reader(&input_path)?,
+                None =>
+                    euler_cryptor::io::stdin_reader()?
+            };
+            let mut output_writer: Box<dyn Write> = match output {
+                Some(output_path) =>
+                    euler_cryptor::io::file_writer(&output_path)?,
+                None =>
+                    euler_cryptor::io::stdout_writer()?
+            };
             let key = euler_cryptor::io::read_key_from(&Path::new(&key_path))?;
             let chunk_size = euler_cryptor::crypto::encryption_chunk_size(&key);
-            euler_cryptor::io::process_chunks_of(&mut input, chunk_size, |chunk| {
+            euler_cryptor::io::process_chunks_of(&mut input_reader, &mut output_writer, chunk_size, |chunk, writer| {
                 let encrypted = euler_cryptor::crypto::encrypt_bytes(&chunk, &key);
-                euler_cryptor::io::write_to_stdout(&encrypted)
+                euler_cryptor::io::write_bytes(&encrypted, writer)
             })
         },
-        Command::Decrypt { key_path } => {
-            let mut input = euler_cryptor::io::stdin_stream()?;
+        Command::Decrypt { key_path, input, output } => {
+            let mut input_reader: Box<dyn BufRead> = match input {
+                Some(input_path) =>
+                    euler_cryptor::io::file_reader(&input_path)?,
+                None =>
+                    euler_cryptor::io::stdin_reader()?
+            };
+            let mut output_writer: Box<dyn Write> = match output {
+                Some(output_path) =>
+                    euler_cryptor::io::file_writer(&output_path)?,
+                None =>
+                    euler_cryptor::io::stdout_writer()?
+            };
             let key = euler_cryptor::io::read_key_from(&Path::new(&key_path))?;
             let chunk_size = euler_cryptor::crypto::decryption_chunk_size(&key);
-            euler_cryptor::io::process_chunks_of(&mut input, chunk_size, |chunk| {
+            euler_cryptor::io::process_chunks_of(&mut input_reader, &mut output_writer, chunk_size, |chunk, writer| {
                 let decrypted = euler_cryptor::crypto::decrypt_bytes(&chunk, &key);
-                euler_cryptor::io::write_to_stdout(&decrypted)
+                euler_cryptor::io::write_bytes(&decrypted, writer)
             })
         }
     }
 }
 
-//TODO: Use the standard pkcs#8 structure for storing the keys
-//TODO: Use PEM over pkcs#8 for storing public and private keys
-//TODO: Allow to provide input to the "encrypt" and "decrypt" commands as a file, option "input" which might be missing. If missing, input is read from stdin
 //TODO: Optimize encryption and decryption of larger files
 //TODO: Allow to stream the message contents when encrypting and decrypting (this should allow to encrypt and decrypt larger files)
 

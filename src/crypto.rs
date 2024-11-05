@@ -250,15 +250,15 @@ mod tests {
             modulo: BigInt::from_u8(13).unwrap(),
             key_type: KeyType::Public
         };
-        assert_eq!(key.as_bytes(), vec![0u8, 0u8, 0u8, 1u8, 0u8, 0u8, 0u8, 1u8, 2u8, 13u8])
+        assert_eq!(key.as_bytes(), vec![48u8, 6u8, 2u8, 1u8, 13u8, 2u8, 1u8, 2u8])
     }
 
     #[test]
     fn should_deserialize_key() {
-        let key_bytes = vec![0u8, 0u8, 0u8, 1u8, 0u8, 0u8, 0u8, 2u8, 2u8, 128u8, 255u8];
+        let key_bytes = vec![48u8, 6u8, 2u8, 1u8, 13u8, 2u8, 1u8, 2u8];
         assert_eq!(Key::from_bytes(&key_bytes, KeyType::Public).unwrap(), Key {
             exponent: BigInt::from_u8(2).unwrap(),
-            modulo: BigInt::from_u16(33023).unwrap(),
+            modulo: BigInt::from_u16(13).unwrap(),
             key_type: KeyType::Public
         })
     }
