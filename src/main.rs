@@ -55,7 +55,6 @@ enum Command {
 fn main() -> Result<(), anyhow::Error> {
     let cli = CliInterface::parse();
     let command = cli.command;
-
     match command {
         Command::GenerateKeyPair { key_directory, key_pair_name, key_size } => {
             fs::create_dir_all(&key_directory)?;
@@ -68,41 +67,21 @@ fn main() -> Result<(), anyhow::Error> {
             Ok(())
         },
         Command::Encrypt { key_path, input, output } => {
-            let mut input_reader: Box<dyn BufRead> = match input {
-                Some(input_path) =>
-                    euler_cryptor::io::file_reader(&input_path)?,
-                None =>
-                    euler_cryptor::io::stdin_reader()?
-            };
-            let mut output_writer: Box<dyn Write> = match output {
-                Some(output_path) =>
-                    euler_cryptor::io::file_writer(&output_path)?,
-                None =>
-                    euler_cryptor::io::stdout_writer()?
-            };
+            let mut reader = euler_cryptor::io::input_reader(&input)?;
+            let mut writer = euler_cryptor::io::output_writer(&output)?;
             let key = euler_cryptor::io::read_key_from(&Path::new(&key_path))?;
             let chunk_size = euler_cryptor::crypto::encryption_chunk_size(&key);
-            euler_cryptor::io::process_chunks_of(&mut input_reader, &mut output_writer, chunk_size, |chunk, writer| {
+            euler_cryptor::io::process_chunks_of(&mut reader, &mut writer, chunk_size, |chunk, writer| {
                 let encrypted = euler_cryptor::crypto::encrypt_bytes(&chunk, &key);
                 euler_cryptor::io::write_bytes(&encrypted, writer)
             })
         },
         Command::Decrypt { key_path, input, output } => {
-            let mut input_reader: Box<dyn BufRead> = match input {
-                Some(input_path) =>
-                    euler_cryptor::io::file_reader(&input_path)?,
-                None =>
-                    euler_cryptor::io::stdin_reader()?
-            };
-            let mut output_writer: Box<dyn Write> = match output {
-                Some(output_path) =>
-                    euler_cryptor::io::file_writer(&output_path)?,
-                None =>
-                    euler_cryptor::io::stdout_writer()?
-            };
+            let mut reader = euler_cryptor::io::input_reader(&input)?;
+            let mut writer = euler_cryptor::io::output_writer(&output)?;
             let key = euler_cryptor::io::read_key_from(&Path::new(&key_path))?;
             let chunk_size = euler_cryptor::crypto::decryption_chunk_size(&key);
-            euler_cryptor::io::process_chunks_of(&mut input_reader, &mut output_writer, chunk_size, |chunk, writer| {
+            euler_cryptor::io::process_chunks_of(&mut reader, &mut writer, chunk_size, |chunk, writer| {
                 let decrypted = euler_cryptor::crypto::decrypt_bytes(&chunk, &key);
                 euler_cryptor::io::write_bytes(&decrypted, writer)
             })

@@ -2,6 +2,10 @@
 
 RSA-implementation in Rust, provides a command line tool and a libary
 
+#### Installation
+
+
+
 #### Examples
 
 ##### Generating keys
@@ -31,7 +35,7 @@ $ cat encrypted_file.txt | euler-crypt decrypt --key-path ./keys/mykeys_sec.pem 
 or
 
 ```bash
-euler-crypt encrypt --key-path ./keys/mykeys_sec.pem --input encrypted_file.txt --output file.txt
+euler-crypt decrypt --key-path ./keys/mykeys_sec.pem --input encrypted_file.txt --output file.txt
 ```
 
 
