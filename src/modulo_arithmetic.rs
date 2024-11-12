@@ -3,25 +3,20 @@ use num_traits::{One, Zero};
 use crate::euclidean;
 
 pub(crate) fn exponent(number: &BigInt, power: &BigInt, modulo: &BigInt) -> BigInt {
-    slow_exponent(number, power, modulo)
-}
-
-//TODO: Move slow_exponent definition to tests once it has been replaced with a faster exponent
-fn slow_exponent(number: &BigInt, power: &BigInt, modulo: &BigInt) -> BigInt {
-    let mut result: BigInt = BigInt::one();
-    let mut number_to_exponentiate: BigInt = number % modulo;
-    for i in 0..power.bits() {
-        if power.bit(i) {
-            result = (&result * &number_to_exponentiate) % modulo;
-        }
-        number_to_exponentiate = (&number_to_exponentiate * &number_to_exponentiate) % modulo;
-    }
-    result
+    fast_exponent(number, power, modulo)
 }
 
 fn fast_exponent(number: &BigInt, power: &BigInt, modulo: &BigInt) -> BigInt {
-    //TODO: Implement using montgomery_form_multiply
-    slow_exponent(number, power, modulo)
+    let optimization = MontgomeryOptimization::for_modulo(&modulo);
+    let mut result: BigInt = optimization.to_montgomery_form(&BigInt::one());
+    let mut number_to_exponentiate: BigInt = optimization.to_montgomery_form(number);
+    for i in 0..power.bits() {
+        if power.bit(i) {
+            result = optimization.montgomery_form_multiply(&result, &number_to_exponentiate);
+        }
+        number_to_exponentiate = optimization.montgomery_form_multiply(&number_to_exponentiate, &number_to_exponentiate);
+    }
+    optimization.from_montgomery_form(&result)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -88,6 +83,28 @@ mod tests {
 
     use super::*;
 
+    // Slow exponent using "% modulo" which is a slow operation for an arbitrary modulo
+    fn slow_exponent(number: &BigInt, power: &BigInt, modulo: &BigInt) -> BigInt {
+        let mut result: BigInt = BigInt::one();
+        let mut number_to_exponentiate: BigInt = number % modulo;
+        for i in 0..power.bits() {
+            if power.bit(i) {
+                result = (&result * &number_to_exponentiate) % modulo;
+            }
+            number_to_exponentiate = (&number_to_exponentiate * &number_to_exponentiate) % modulo;
+        }
+        result
+    }
+
+    #[test]
+    fn exponent_with_montgomery_multiplication() {
+        let number = BigInt::from_u64(32817698412213213).unwrap();
+        let power = BigInt::from_u64(8752368742787).unwrap();
+        let modulo = BigInt::from_u64(404790586766519).unwrap();
+
+        assert_eq!(fast_exponent(&number, &power, &modulo), slow_exponent(&number, &power, &modulo))
+    }
+
     #[test]
     fn montgomery_optimization_for_modulo() {
         let n = BigInt::from_u8(11).unwrap();
@@ -122,9 +139,9 @@ mod tests {
 
     #[test]
     fn should_exponentiate_correctly() {
-        let result = exponent(&BigInt::from_u16(2).unwrap(), &BigInt::from_u16(4).unwrap(), &BigInt::from_u16(32).unwrap());
+        let result = exponent(&BigInt::from_u16(2).unwrap(), &BigInt::from_u16(4).unwrap(), &BigInt::from_u16(17).unwrap());
         assert_eq!(result, BigInt::from_u16(16).unwrap());
-        let result = exponent(&BigInt::from_u16(2).unwrap(), &BigInt::from_u16(30).unwrap(), &BigInt::from_u64(10000000000).unwrap());
-        assert_eq!(result, BigInt::from_u32(1073741824).unwrap())
+        let result = exponent(&BigInt::from_u16(2).unwrap(), &BigInt::from_u16(30).unwrap(), &BigInt::from_u64(17).unwrap());
+        assert_eq!(result, BigInt::from_u32(13).unwrap())
     }
 }
