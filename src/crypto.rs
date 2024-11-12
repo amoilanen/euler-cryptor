@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use num_bigint::{BigInt, Sign};
 use num_traits::One;
 use num_traits::{FromPrimitive, Zero};
-use std::cmp;
+use std::{cmp, result};
 use rand::Rng;
 use yasna::{self, ASN1Error};
 
@@ -160,12 +160,14 @@ fn encrypt_number(number_to_encrypt: &BigInt, key: &Key) -> BigInt {
 
 const ENCRYPTED_CHUNK_PREFIX: u8 = 128;
 
-fn encrypt_chunk(data: &Vec<u8>, key: &Key, modulo_size_bytes: usize) -> Vec<u8> {
+fn encrypt_chunk(data: &[u8], key: &Key, modulo_size_bytes: usize) -> Vec<u8> {
     let number_to_encrypt = BigInt::from_bytes_be(Sign::Plus, &data);
     let encrypted = encrypt_number(&number_to_encrypt, key).to_bytes_be();
     let mut result_bytes = encrypted.1;
-    while result_bytes.len() < modulo_size_bytes {
-        result_bytes.insert(0, 0u8); // Pad the result with zeros to be exactly modulo_size_bytes
+    if result_bytes.len() < modulo_size_bytes {
+        let mut padded_result_bytes = vec![0u8; modulo_size_bytes - result_bytes.len()];
+        padded_result_bytes.extend(result_bytes);
+        result_bytes = padded_result_bytes;
     }
     result_bytes
 }
@@ -184,15 +186,12 @@ pub fn encrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
     let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
     // leave one byte for ENCRYPTED_PREFIX and one byte to make sure that modulo is not overflown
     let block_size_bytes = cmp::max(modulo_size_bytes - 2, 1);
-    let mut all_bytes = Vec::new();
-    all_bytes.extend(data);
 
     let mut encrypted: Vec<u8> = Vec::new();
-    for chunk in all_bytes.chunks(block_size_bytes) {
-        let mut data_to_encrypt: Vec<u8> = Vec::new();
-        data_to_encrypt.push(ENCRYPTED_CHUNK_PREFIX);
+    for chunk in data.chunks(block_size_bytes) {
+        let mut data_to_encrypt: Vec<u8> = vec![ENCRYPTED_CHUNK_PREFIX];
         data_to_encrypt.extend(chunk);
-        let encrypted_chunk = encrypt_chunk(&data_to_encrypt.to_vec(), &key, modulo_size_bytes);
+        let encrypted_chunk = encrypt_chunk(&data_to_encrypt, &key, modulo_size_bytes);
         encrypted.extend(encrypted_chunk);
     }
     encrypted
@@ -202,7 +201,7 @@ pub fn decrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
     let modulo_size_bytes = key.modulo.to_bytes_be().1.len();
     let mut decrypted: Vec<u8> = Vec::new();
     for chunk in data.chunks(modulo_size_bytes) {
-        let decrypted_data = encrypt_chunk(&chunk.to_vec(), &key, modulo_size_bytes);
+        let decrypted_data = encrypt_chunk(&chunk, &key, modulo_size_bytes);
         let mut i = 0;
         let mut has_found_prefix = decrypted_data[i] == ENCRYPTED_CHUNK_PREFIX;
         while !has_found_prefix && decrypted_data[i] == 0 {
@@ -210,8 +209,7 @@ pub fn decrypt_bytes(data: &Vec<u8>, key: &Key) -> Vec<u8> {
             has_found_prefix = decrypted_data[i] == ENCRYPTED_CHUNK_PREFIX;
         }
         //assert!(has_found_prefix);
-        let decrypted_chunk = decrypted_data[i + 1..].to_vec();
-        decrypted.extend(decrypted_chunk);
+        decrypted.extend(&decrypted_data[i + 1..]);
     }
     decrypted
 }
