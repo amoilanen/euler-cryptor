@@ -58,7 +58,7 @@ fn main() -> Result<(), anyhow::Error> {
     match command {
         Command::GenerateKeyPair { key_directory, key_pair_name, key_size } => {
             fs::create_dir_all(&key_directory)?;
-            let (public_key, private_key) = euler_cryptor::crypto::generate_keys(key_size);
+            let (public_key, private_key) = euler_cryptor::crypto::generate_keys(key_size)?;
             let public_key_path = euler_cryptor::io::create_key_path(&key_directory, &key_pair_name, "pub");
             euler_cryptor::io::save_key_to(&public_key, public_key_path.as_path())?;
             let private_key_path = euler_cryptor::io::create_key_path(&key_directory, &key_pair_name, "sec");
@@ -93,7 +93,6 @@ fn main() -> Result<(), anyhow::Error> {
 //TODO: Allow to stream the message contents when encrypting and decrypting (this should allow to encrypt and decrypt larger files)
 
 //TODO: Use logging and support the "verbose" option
-//TODO: Avoid using "unwrap"
 
 //TODO: Add examples:
 // - How the command line tool can be used to sign and verify messages (signing with the private key)

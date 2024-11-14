@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use num_traits::FromPrimitive;
+use num_traits::{FromPrimitive, One, Zero};
 
 //gcd = a * x + b * y
 #[derive(Debug, PartialEq)]
@@ -30,15 +30,15 @@ pub(crate) fn find_gcd_and_bezout_coefficients(first: &BigInt, second: &BigInt) 
      * x1 = x0 - x1 * q
      * y1 = y0 - y1 * q
      */
-    let mut x0: BigInt = BigInt::from_u16(1).unwrap();
-    let mut y0: BigInt = BigInt::from_u16(0).unwrap();
-    let mut x1: BigInt = BigInt::from_u16(0).unwrap();
-    let mut y1: BigInt = BigInt::from_u16(1).unwrap();
+    let mut x0: BigInt = BigInt::one();
+    let mut y0: BigInt = BigInt::zero();
+    let mut x1: BigInt = BigInt::zero();
+    let mut y1: BigInt = BigInt::one();
     let mut a = if first > second { first.clone() } else { second.clone() };
     let mut b = if first > second { second.clone() } else { first.clone() };
     let mut r;
     let mut q;
-    while b != BigInt::from_u8(0).unwrap() {
+    while b != BigInt::zero() {
         r = &a % &b;
         q = &a / &b;
         a = b;

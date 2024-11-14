@@ -1,5 +1,5 @@
 use num_bigint::{BigInt, RandBigInt};
-use num_traits::{FromPrimitive, Zero};
+use num_traits::{FromPrimitive, One, Zero};
 use rand::thread_rng;
 
 use crate::modulo_arithmetic;
@@ -73,9 +73,10 @@ pub(crate) fn miller_rabin_primality_test(n: &BigInt) -> bool {
     // a ^ (n - 1) = 1 (mod n) for prime n (Fermat's Little Theorem)
     let mut s = 0;
     let mut d: BigInt = n - 1;
+    let two = BigInt::one() << 1;
     while &d % 2 == BigInt::zero() {
         s = s + 1;
-        d = d / BigInt::from_u8(2).unwrap();
+        d = d / &two;
     }
     let mut passed_check: bool = true;
     let mut bases_to_try = NUM_OF_BASES_TO_TRY;
@@ -86,7 +87,7 @@ pub(crate) fn miller_rabin_primality_test(n: &BigInt) -> bool {
         let mut base_exponent = modulo_arithmetic::exponent(&base, &d, &n);
 
         // a ^ d != 1 (mod p)
-        if base_exponent != BigInt::from_u8(1).unwrap() {
+        if base_exponent != BigInt::one() {
             let mut r = 0;
             // a ^ (2 ^ r) ^ d != -1 (mod p)
             while base_exponent != n - 1 && r < s {
@@ -116,7 +117,7 @@ mod tests {
         assert_eq!(primes_segment(40, 50), vec![41, 43, 47]);
         assert_eq!(primes_segment(80, 100), vec![83, 89, 97]);
         assert_eq!(primes_segment(10000000000000, 10000000000100), vec![10000000000037, 10000000000051, 10000000000099]);
-        //Would already be too slow, better to use a more optimized approach, such as the AKS primality test
+        //Would already be too slow, better to use a more optimized approach, such as the Miller-Rabin primality test
         //assert_eq!(primes_segment(1000000000000000000, 1000000000000001000), vec![]);
     }
 

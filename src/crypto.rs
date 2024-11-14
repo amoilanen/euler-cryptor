@@ -87,7 +87,7 @@ impl Key {
 fn find_private_key(totient_function: &BigInt, public_key: &BigInt) -> BigInt {
     let gcd_and_coefficients = euclidean::find_gcd_and_bezout_coefficients(public_key, totient_function);
     let mut private_key = gcd_and_coefficients.y;
-    if private_key < BigInt::from_u8(0).unwrap() {
+    if private_key < BigInt::zero() {
         private_key = private_key + totient_function;
     }
     private_key
@@ -126,7 +126,7 @@ fn find_random_prime(prime_bits: usize, first_primes: &Vec<usize>) -> BigInt {
     prime_candidate
 }
 
-pub fn generate_keys(key_size: u16) -> (Key, Key) {
+pub fn generate_keys(key_size: u16) -> Result<(Key, Key), anyhow::Error> {
     let first_primes = primes::primes(1000);
     let prime_bits = (key_size / 2) as usize;
     let p = find_random_prime(prime_bits, &first_primes);
@@ -134,12 +134,12 @@ pub fn generate_keys(key_size: u16) -> (Key, Key) {
     while q == p {
         q = find_random_prime(prime_bits, &first_primes);
     }
-    let public_exponent: BigInt = BigInt::from_u32(PUBLIC_EXPONENT).unwrap();
+    let public_exponent: BigInt = BigInt::from_u32(PUBLIC_EXPONENT).ok_or(anyhow!("Cannot convert {} to BigInt", PUBLIC_EXPONENT))?;
 
     let n: BigInt = &p * &q;
     let totient_function = (&p - 1) * (&q - 1);
     let private_exponent = find_private_key(&totient_function, &public_exponent);
-    assert_eq!((&public_exponent * &private_exponent) % totient_function, BigInt::from_u8(1).unwrap());
+    assert_eq!((&public_exponent * &private_exponent) % totient_function, BigInt::one());
 
     let public_key = Key {
         exponent: public_exponent,
@@ -151,7 +151,7 @@ pub fn generate_keys(key_size: u16) -> (Key, Key) {
         modulo: n,
         key_type: KeyType::Private
     };
-    (public_key, private_key)
+    Ok((public_key, private_key))
 }
 
 fn encrypt_number(number_to_encrypt: &BigInt, key: &Key) -> BigInt {
@@ -233,7 +233,7 @@ mod tests {
     }
 
     fn generated_keys() -> (Key, Key) {
-        generate_keys(2048)
+        generate_keys(2048).unwrap()
     }
 
     fn get_random_bytes(size: usize) -> Vec<u8> {
