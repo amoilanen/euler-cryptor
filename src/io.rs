@@ -21,6 +21,20 @@ pub fn create_key_path(key_directory: &str, key_pair_name: &str, key_prefix: &st
     Path::new(&key_directory).join(&key_file_name)
 }
 
+pub fn encrypt(reader: &mut Box<dyn BufRead>, writer: &mut Box<dyn Write>, key: &crypto::Key, chunk_size: usize) -> Result<(), anyhow::Error> {
+    process_chunks_of(reader, writer, chunk_size, |chunk, writer| {
+        let encrypted = crypto::encrypt_bytes(&chunk, &key);
+        write_bytes(&encrypted, writer)
+    })
+}
+
+pub fn decrypt(reader: &mut Box<dyn BufRead>, writer: &mut Box<dyn Write>, key: &crypto::Key, chunk_size: usize) -> Result<(), anyhow::Error> {
+    process_chunks_of(reader, writer, chunk_size, |chunk, writer| {
+        let decrypted = crypto::decrypt_bytes(&chunk, &key);
+        write_bytes(&decrypted, writer)
+    })
+}
+
 pub fn process_chunks_of<F>(input: &mut Box<dyn BufRead>, output: &mut Box<dyn Write>, chunk_size: usize, chunk_processor: F) -> Result<(), anyhow::Error>
 where F: Fn(&Vec<u8>, &mut Box<dyn Write>) -> Result<(), anyhow::Error> {
     let mut buffer = vec![0u8; chunk_size];
